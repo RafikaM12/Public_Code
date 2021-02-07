@@ -1,0 +1,161 @@
+library(sqldf) 
+library(RH2) 
+library(tidyverse) 
+library(dplyr) 
+library(glmnet) 
+library(corrplot) 
+library(RColorBrewer) 
+library(AmesHousing) 
+library(MASS) 
+library(caret) 
+library(Metrics) 
+library(randomForest) 
+library(ggplot2) 
+library(gdata) 
+library(stringr) 
+library(lubridate) 
+library(scales) 
+library(graphics) 
+
+# load training data house_train_orig = read.csv("/Users/mathurfamily/Documents/IIT Chicago Classes/CSP 571 Data Preparation and Analysis/Project/house-prices-advanced-regression-techniques/train.csv") 
+train_original <- house_train_orig # dropping columns  train_drop <- subset(train_original, select = -c(Alley, PoolQC, MiscFeature, Fence, FireplaceQu)) train <- train_drop # dealing with train_new <- train train_new$MasVnrType = as.character(train_new$MasVnrType) train_new$MasVnrType[is.na(train_new$MasVnrType)] = "UNK" train_new$MasVnrType = as.factor(train_new$MasVnrType) train <- train_new unique(train$MasVnrType) train_new <- train train_new$BsmtExposure = as.character(train_new$BsmtExposure) train_new$BsmtExposure[is.na(train_new$BsmtExposure)] = "XX" train_new$BsmtExposure = as.factor(train_new$BsmtExposure) train <- train_new unique(train$BsmtExposure) train_new <- train 
+
+
+train_new$BsmtQual = as.character(train_new$BsmtQual) 
+train_new$BsmtQual[is.na(train_new$BsmtQual)] = "XX" 
+train_new$BsmtQual = as.factor(train_new$BsmtQual) 
+train <- train_new 
+unique(train$BsmtQual) train_new <- train train_new$BsmtCond= as.character(train_new$BsmtCond) 
+train_new$BsmtCond[is.na(train_new$BsmtCond)] = "XX" train_new$BsmtCond = as.factor(train_new$BsmtCond) train <- train_new unique(train$BsmtCond) train_new <- train train_new$BsmtFinType1= as.character(train_new$BsmtFinType1) 
+train_new$BsmtFinType1[is.na(train_new$BsmtFinType1)] = "UNK" train_new$BsmtFinType1 = as.factor(train_new$BsmtFinType1) train <- train_new unique(train$BsmtFinType1) train_new <- train train_new$BsmtFinType2= as.character(train_new$BsmtFinType2) 
+train_new$BsmtFinType2[is.na(train_new$BsmtFinType2)] = "UNK" train_new$BsmtFinType2 = as.factor(train_new$BsmtFinType2) train <- train_new unique(train$BsmtFinType2) train_new <- train # We do have skewness in this data for LotFrontage even after removing NA, taking a mean would mean that # the distribution moves to the right. Was initially thinking of doing a simple LM to fill the NA # but this predictor clearly does not have a linear relationship with the output. # Removing the skewed data points (>300) and then taking the mean rounded up to replace NA for LotFrontage train_nona <- train_new train_nona <- data.frame(SalePrice = train$SalePrice, LotFrontage = train$LotFrontage) 
+train_nona = drop_na(train_nona) train_nona = subset(train_nona, LotFrontage < 300) mean_LotFrontage = round(mean(train_nona$LotFrontage)) mean_LotFrontage train_new <- train train_new$LotFrontage = as.numeric(train_new$LotFrontage) 
+train_new$LotFrontage[is.na(train_new$LotFrontage)] = mean_LotFrontage train <- train_new train_new <- train train_new$Electrical= as.character(train_new$Electrical) 
+train_new$Electrical[is.na(train_new$Electrical)] = "X" 
+
+
+train_new$Electrical = as.factor(train_new$Electrical) 
+train <- train_new unique(train$Electrical) train_new <- train 
+train_new$GarageType= as.character(train_new$GarageType) 
+train_new$GarageType[is.na(train_new$GarageType)] = "UNK" 
+train_new$GarageType = as.factor(train_new$GarageType) 
+train <- train_new 
+unique(train$GarageType) train_new <- train train_new$GarageCond = as.character(train_new$GarageCond) 
+train_new$GarageCond[is.na(train_new$GarageCond)] = "XX" train_new$GarageCond = as.factor(train_new$GarageCond) train <- train_new unique(train$GarageCond) train_new <- train train_new$GarageFinish = as.character(train_new$GarageFinish)
+train_new$GarageFinish[is.na(train_new$GarageFinish)] = "UNK" train_new$GarageFinish = as.factor(train_new$GarageFinish) train <- train_new unique(train$GarageFinish) train_new <- train train_new$GarageQual = as.character(train_new$GarageQual) 
+train_new$GarageQual[is.na(train_new$GarageQual)] = "XX" train_new$GarageQual = as.factor(train_new$GarageQual) train <- train_new unique(train$GarageQual) train_new <- train # As MasVnrArea is numeric, we only have a few missing values and a linear fit between this predictor and SalePrice # seems so to work well, using a linear model to predict and replace NA values 
+train_masvnrarea = data.frame(SalePrice = train_new$SalePrice, MasVnrArea = train_new$MasVnrArea) train_masvnrarea_nona = drop_na(train_masvnrarea) lm.fit = lm(MasVnrArea~SalePrice, data = train_masvnrarea_nona) pred = predict(lm.fit, train_masvnrarea) train_masvnrarea[3] = pred train_masvnrarea$MasVnrArea = as.numeric(train_masvnrarea$MasVnrArea) 
+train_masvnrarea$V3 = as.numeric(train_masvnrarea$V3) 
+train_masvnrarea$MasVnrArea[is.na(train_masvnrarea$MasVnrArea)] = train_masvnrarea$V3[is.na(train_masvnrarea$MasVnrArea)] train_new$MasVnrArea = train_masvnrarea$MasVnrArea train <- train_new 
+
+
+train_new <- train train_new$GarageYrBlt = as.character(train_new$GarageYrBlt) 
+train_new$GarageYrBlt[is.na(train_new$GarageYrBlt)] = 0 train_new$GarageYrBlt = as.factor(train_new$GarageYrBlt) train <- train_new unique(train$GarageYrBlt) train_new <- train summary(train_new) # reducing number of features based on analysis train_drop <- subset(train_new, select = -c(Heating, Electrical, LowQualFinSF, BsmtHalfBath, BedroomAbvGr, GrLivArea, Functional, MiscVal, MoSold, YrSold, SaleType, SaleCondition, X3SsnPorch, EnclosedPorch) ) dim(train) dim(train_drop) train <- train_drop train_new <- train # garage years are from 1900 - 2010 # GarageYrBlt # garages built before 1993 on average have a more impactful t-statistic and p-value # transforming this feature to have 2 possible values - 0 or built on or before 1993 and everything else train_new$GarageYear = rep(0, dim(train_new)[1]) train_new$GarageYear[as.numeric(as.character(train_new$GarageYrBlt)) > 1993] = 1 train_new = subset(train_new, select = -c(GarageYrBlt)) train = train_new train_new = train dim(train) summary(train) # dropping feastures based on Amretha's Analysis train_drop <- subset(train_new, select = -c(YearBuilt, RoofStyle, Exterior1st, Exterior2nd, MasVnrType, ExterQual, ExterCond) ) train <- train_drop train_new <- train train_drop <- subset(train_new, select = -c(Foundation, BsmtQual, BsmtCond, BsmtExposure, BsmtFinType1, BsmtFinType2, BsmtFinSF2) ) train <- train_drop train_new <- train dim(train) # As per Lasso Results (lasso coefficient estimates to zero) we can also drop HalfBath, GarageType train_drop <- subset(train_new, select = -c(HalfBath, GarageType) ) train <- train_drop train_new <- train 
+dim(train) # As per Lasso Results (lasso coefficient estimates to zero) we can also drop OpenPorchSF and BsmtUnfSF train_drop <- subset(train_new, select = -c(OpenPorchSF, BsmtUnfSF) ) train <- train_drop train_new <- train dim(train) # lasso removes LotFrontage, GarageCond, PoolArea train_drop <- subset(train_new, select = -c(LotFrontage, GarageCond, PoolArea) ) train <- train_drop train_new <- train dim(train) 
+
+# modeling analysis summary(train) 
+ggplot(data=train, aes(x = LotArea, y = SalePrice)) + geom_point() + geom_smooth() 
+set.seed(1111) trainIndex <- createDataPartition(train$SalePrice, p = .8, list=FALSE, times=1) 
+trainData = train[trainIndex,] 
+testData = train[-trainIndex,] lm.fit1 = lm(SalePrice~LotArea, trainData) summary(lm.fit1) # plot(lm.fit1) # LotArea has an outlier ggplot(data=train, aes(x = MasVnrArea, y = SalePrice)) + geom_point() + geom_smooth() 
+set.seed(1112) trainIndex2 <- createDataPartition(train$SalePrice, p = .8, list=FALSE, times=1) trainData2 = train[trainIndex2,] testData2 = train[-trainIndex2,] lm.fit2 = lm(SalePrice~MasVnrArea, trainData2) summary(lm.fit2) # plot(lm.fit2) # MasVnrArea Seems fine as is ggplot(data=train, aes(x = BsmtFinSF1, y = SalePrice)) + geom_point() + geom_smooth() 
+set.seed(1113) trainIndex3 <- createDataPartition(train$SalePrice, p = .8, list=FALSE, times=1) 
+trainData3 = train[trainIndex3,] testData3 = train[-trainIndex3,] lm.fit3 = lm(SalePrice~BsmtFinSF1, trainData3) summary(lm.fit3) # plot(lm.fit3) 
+
+# A u shape in studentized residuals vs fitted values for BsmtFinSF1 # there is an outlier for BsmtFinSF1 ggplot(data=train, aes(x = TotalBsmtSF, y = SalePrice)) + geom_point() 
+set.seed(1114) 
+trainIndex4 <- createDataPartition(train$SalePrice, p = .8, list=FALSE, times=1) 
+trainData4 = train[trainIndex4,] testData4 = train[-trainIndex4,] lm.fit4 = lm(SalePrice~TotalBsmtSF, trainData4) 
+summary(lm.fit4) # plot(lm.fit4) # A u shape in studentized residuals vs fitted values for TotalBsmtSF # there is an outlier / high leverage point for TotalBsmtSF ggplot(data=train, aes(x = X1stFlrSF, y = SalePrice)) + geom_point() 
+set.seed(1115) trainIndex5 <- createDataPartition(train$SalePrice, p = .8, list=FALSE, times=1) 
+trainData5 = train[trainIndex5,] testData5 = train[-trainIndex5,] lm.fit5 = lm(SalePrice~X1stFlrSF, trainData5) summary(lm.fit5) # plot(lm.fit5) # A u shape in studentized residuals vs fitted values for X1stFlrSF 
+ggplot(data=train, aes(x = X2ndFlrSF, y = SalePrice)) + geom_point() 
+set.seed(1116) trainIndex6 <- createDataPartition(train$SalePrice, p = .8, list=FALSE, times=1) 
+trainData6 = train[trainIndex6,] testData6 = train[-trainIndex6,] lm.fit6 = lm(SalePrice~X2ndFlrSF, trainData6) summary(lm.fit6) # plot(lm.fit6) # A u shape in studentized residuals vs fitted values for X2ndFlrSF # High Leverage point ggplot(data=train, aes(x = GarageArea , y = SalePrice)) + geom_point() set.seed(1117) trainIndex7 <- createDataPartition(train$SalePrice, p = .8, list=FALSE, times=1) 
+trainData7 = train[trainIndex7,] testData7 = train[-trainIndex7,] lm.fit7 = lm(SalePrice~GarageArea, trainData7) summary(lm.fit7) # plot(lm.fit7) # High Leverage point for GarageArea ggplot(data=train, aes(x = WoodDeckSF , y = SalePrice)) + geom_point() 
+set.seed(1118) trainIndex8 <- createDataPartition(train$SalePrice, p = .8, list=FALSE, times=1) 
+trainData8 = train[trainIndex8,] testData8 = train[-trainIndex8,] lm.fit8 = lm(SalePrice~WoodDeckSF, trainData8) summary(lm.fit8) # plot(lm.fit8) # Outlier for WoodDeckSF # not linear relationship ggplot(data=train, aes(x = ScreenPorch , y = SalePrice)) + geom_point() 
+set.seed(1119) trainIndex9 <- createDataPartition(train$SalePrice, p = .8, list=FALSE, times=1) 
+trainData9 = train[trainIndex9,] testData9 = train[-trainIndex9,] lm.fit9 = lm(SalePrice~ScreenPorch, trainData9) summary(lm.fit9) #plot(lm.fit9) # High Leverage point for ScreenPorch 
+
+# model 1 - simple linear regression + 5-fold cv 
+set.seed(1) data_ctrl <- trainControl(method = "cv", number = 5) linear_model_1 <- train(SalePrice ~ ., data = train, trControl = data_ctrl, method = "lm", na.action = na.pass) 
+ 
+linear_model_1 # RMSE: 38432.87, Rsquared: 0.7821678 
+linear_model_1$finalModel 
+# model 2 - remove outliers + simple linear regression + 5-fold cv 
+# LotArea has an outlier # There is an outlier for BsmtFinSF1 # There is an outlier / high leverage point for TotalBsmtSF 
+# X2ndFlrSF - high leverage point # High Leverage point for GarageArea 
+# Outlier for WoodDeckSF # High Leverage point for ScreenPorch 
+max(train$LotArea) 
+#plot(train$LotArea) 
+
+dim(train) train = subset(train, train$LotArea < 215000) 
+dim(train) max(train$BsmtFinSF1) #plot(train$BsmtFinSF1) dim(train) train = subset(train, train$BsmtFinSF1 <= 3000) 
+dim(train) max(train$TotalBsmtSF) #plot(train$TotalBsmtSF) dim(train) train = subset(train, train$TotalBsmtSF <= 3000) 
+dim(train) max(train$WoodDeckSF) #plot(train$WoodDeckSF) dim(train) train = subset(train, train$WoodDeckSF < 800) 
+dim(train) set.seed(2) data_ctrl2 <- trainControl(method = "cv", number = 5) 
+linear_model_2 <- train(SalePrice ~ ., data = train, trControl = data_ctrl2, method = "lm", na.action = na.pass) 
+linear_model_2 # RMSE: 26708.96, Rsquared: 0.8873463 
+linear_model_2$finalModel 
+# model 3 - remove outliers + simple linear regression + polynomials + 5-fold cv 
+train <- train_new train = subset(train, train$LotArea < 215000) train = subset(train, train$BsmtFinSF1 <= 3000) 
+train = subset(train, train$TotalBsmtSF <= 3000) train = subset(train, train$WoodDeckSF < 800) 
+# BsmtFinSF1 # TotalBsmtSF 
+# X1stFlrSF # X2ndFlrSF # WoodDeckSF set.seed(3) data_ctrl3 <- trainControl(method = "cv", number = 5) linear_model_3 <- train(SalePrice ~ .+I(BsmtFinSF1^2) + I(TotalBsmtSF^2) + I(X1stFlrSF^2) + I(X2ndFlrSF^2) + I(WoodDeckSF^2),  data = train, trControl = data_ctrl3, method = "lm", na.action = na.pass) 
+linear_model_3 # RMSE: 24941, Rsquared: 0.8971596 
+linear_model_3$finalModel # will use model 3 as the final model 
+
+#Finding the StepwiseAIC regression model for the dataset manually 
+full.model <- lm(SalePrice ~., data = predrop) # Stepwise regression model step.model <- stepAIC(full.model, direction = "both", trace = FALSE) 
+summary(step.model) 
+step.model$rank 
+#Finding the RMSE and r-squared for every split using the old dataset  
+set.seed(123) # Set up repeated k-fold cross-validation train.control <- trainControl(method = "cv", number = 5) 
+# Train the model step.model <- train(SalePrice ~., data = predrop, method = "leapBackward", tuneGrid = data.frame(nvmax = 1:80), trControl = train.control) 
+step.model$results 
+#Renaming the column names of the cleaned dataset from the AmesHousing 
+library make_ames() orig_ames_make<- make_ames() columnnamescsv <- read.csv("train.csv") #Extracting column headings 
+columnnames <- colnames(columnnamescsv) 
+columnnames<- columnnames[-1] 
+columnnames<- columnnames[-59] 
+columnnames[80] <- "Longitude"
+columnnames[81] <- "Latitude" columnnames names(orig_ames_make) <- c(columnnames) 
+orig_ames_make 
+
+#Finding the StepwiseAIC regression model for the make_ames() dataset 
+#summary(make_ames()) full.model <- lm(SalePrice ~., data = orig_ames_make) # Stepwise regression model 
+step.model <- stepAIC(full.model, direction = "both", trace = FALSE) 
+summary(step.model) 
+#Finding the RMSE and r-squared for every split using the make_ames() dataset 
+set.seed(13) # Set up repeated k-fold cross-validation train.control <- trainControl(method = "cv", number = 5) 
+# Train the model step.model <- train(SalePrice ~., data = orig_ames_make, method = "leapBackward", tuneGrid = data.frame(nvmax = 1:80), trControl = train.control) 
+step.model$results 
+
+#Random Forest Code #Partition of data inTrain = createDataPartition(input$SalePrice, p = 4/5)[[1]] 
+train_input = input[ inTrain,] test_input = input[-inTrain,] 
+#Random forest model model_train <- randomForest(SalePrice ~.,data = train_input,importance = TRUE) 
+#Prediction based on the model model_pred <- predict(model_train,train_input) # Gives the variance explained value and MSE print(model_train) # Gives the list of features that are important for analysis varImpPlot(model_train) # After 300 trees error rate has stabilized 
+#Function to calculate RMSE rmse_function <- function(pred, actual) { 
+sqrt(sum(pred - actual)^2) } 
+
+
+#Calculating RMSE train 
+rmse_train <- rmse_function(model_pred, train_input$SalePrice) 
+rmse_train #Calculating RMSE test model_pred_test <- predict(model_train,test_input) 
+rmse_test <- rmse_function(model_pred_test, test_input$SalePrice) 
+rmse_test 
+
+#Calculating mean OOB_Error n_tree = 50 Rf_model <- randomForest(SalePrice ~., ntree = n_tree, data = train_input, keep.inbag=T) 
+inbag <- lapply(1:n_tree, function(x) which(Rf_model[["inbag"]][ ,x] == 0)) rf_pred <- lapply(inbag, function(x) predict(Rf_model, train_input[x, ])) # predictions (oob_err <- map2_dbl(rf_pred, inbag, function(x, y) rmse_function(x, train_input[y, ]$SalePrice))) 
+mean(oob_err) 
+
+# Tuning parameters of random forest for improving the RMSE values. # WE find the number of error decreases and stabilized @ ntree = 300 plot(model_train) # Finding mtry value We plot oob err and test error for each value of mtry and find the one where the oob error is least from plot 
+require(randomForest) require(MASS) train = sample(1:nrow(input),300)
+input.rf=randomForest(SalePrice~.,data = input,subset = train) 
+input.rf plot(input.rf) oob.err=double(75) test.err=double(75) #mtry is no of Variables randomly chosen at each split 
+for(mtry in 1:75) { 
+rf=randomForest(SalePrice ~ .,data = input , subset = train,mtry=mtry,ntree=400) oob.err[mtry] = rf$mse[400]  pred<-predict(rf,input[-train,])  test.err[mtry]= with(input[-train,], mean( (SalePrice - pred)^2)) cat(mtry," ") #printing the output to the console 
+} test.err oob.err 
+#Plot graph between oob err and test err matplot(1:mtry , cbind(oob.err,test.err), pch=19 ,col =c("red","blue"),type="b",ylab="Mean Squared Error",xlab="Number of Predictors Considered at each Split") legend("topright",legend=c("Out of Bag Error","Test Error"),pch=19, col=c("red","blue")) 
+# mtry = 25 gives the least oob_error. Therefore, we choose this value for our hyper parameter 
