@@ -1,0 +1,526 @@
+# Data Formatting 
+library(readxl)
+library(lubridate)
+library(tidyr)
+
+
+
+####################################Intermodal - Summary-M############################################
+
+summary <- data.frame(t(read_excel("Intermodal Database July 2020.xlsx", sheet = "summary-m", na = c("", "n/a"))), stringsAsFactors = F)
+
+##Create Date Column
+summary$date <- ymd(paste(summary$X1, summary$X2, "1"))
+
+##Merge headers with their sub-variables
+holder <- NA
+for (i in 3:ncol(summary)){
+  if (!is.na(summary[3, i])){
+    summary[3, i] <- paste(holder, "-", summary[3, i])
+  }
+  
+  else if (!is.na(summary[2, i])){
+    holder <- summary[2, i]
+    summary[3, i] <- summary[2, i]
+  }
+}
+
+##Change Headers
+names(summary) <- summary[3, ]
+names(summary)[ncol(summary)] <- "Date"
+
+
+##Remove top empty rows
+summary <- summary[!is.na(summary[, 2]), ]
+
+##Remove empty columns
+summary <- summary[colSums(!is.na(summary))>0]
+
+##Select our desired columns
+reformatted_summary <- cbind(summary$Date, summary[, 3:(ncol(summary)-1)])
+names(reformatted_summary)[1] <- "Date"
+
+##Change character type columns to numeric type
+reformatted_summary <- cbind(reformatted_summary[1]
+                          ,sapply(reformatted_summary[2:ncol(reformatted_summary)], function(y) as.numeric(y)))
+
+##Reset Indexing
+rownames(reformatted_summary) <- 1:nrow(reformatted_summary)
+
+
+
+
+######################################Intermodal - Rates-M############################################
+
+rates <- data.frame(t(read_excel("Intermodal Database July 2020.xlsx", sheet = "rates-m", na = c("", "n/a"))), stringsAsFactors = F)
+
+##Create Date Column
+rates$date <- ymd(paste(rates$X1, rates$X2, "1"))
+
+##Merge headers with their sub-variables
+holder <- NA
+for (i in 3:ncol(rates)){
+  if (!is.na(rates[2, i])){
+    rates[2, i] <- paste(holder, "-", rates[2, i])
+  }
+  
+  else if (!is.na(rates[1, i])){
+    holder <- rates[1, i]
+    rates[2, i] <- rates[1, i]
+  }
+}
+
+##Change Headers
+names(rates) <- rates[2, ]
+names(rates)[ncol(rates)] <- "Date"
+
+
+##Remove top empty rows
+rates <- rates[!is.na(rates[, ncol(rates)]), ]
+
+##Remove empty columns
+rates <- rates[colSums(!is.na(rates))>0]
+
+##Select our desired columns
+reformatted_rates <- cbind(rates$Date, rates[, 3:(ncol(rates)-1)])
+names(reformatted_rates)[1] <- "Date"
+
+##Change character type columns to numeric type
+reformatted_rates <- cbind(reformatted_rates[1]
+                             ,sapply(reformatted_rates[2:ncol(reformatted_rates)], function(y) as.numeric(y)))
+
+##Reset Indexing
+rownames(reformatted_rates) <- 1:nrow(reformatted_rates)
+
+
+
+
+###############################Truck and Trailer - Freight-M#########################################
+freight <- data.frame(t(read_excel("Truck & Trailer Database July 2020.xlsx", sheet = "freight-m", na = c("", "n/a"))), stringsAsFactors = F)
+
+##Create Date Column
+freight$date <- ymd(paste(freight$X1, freight$X2, "1"))
+
+##Merge headers with their sub-variables
+holder <- NA
+for (i in 3:ncol(freight)){
+  if (!is.na(freight[3, i])){
+    freight[3, i] <- paste(holder, "-", freight[3, i])
+  }
+  
+  else if (!is.na(freight[2, i])){
+    holder <- freight[2, i]
+    freight[3, i] <- freight[2, i]
+  }
+}
+
+##Change Headers
+names(freight) <- freight[3, ]
+names(freight)[ncol(freight)] <- "Date"
+
+
+##Remove top empty rows
+freight <- freight[!is.na(freight[, 2]), ]
+
+##Remove empty columns
+freight <- freight[colSums(!is.na(freight))>0]
+
+##Select our desired columns
+reformatted_freight <- cbind(freight$Date, freight[, 3:(ncol(freight)-1)])
+names(reformatted_freight)[1] <- "Date"
+
+##Change character type columns to numeric type
+reformatted_freight <- cbind(reformatted_freight[1]
+                          ,sapply(reformatted_freight[2:ncol(reformatted_freight)], function(y) as.numeric(y)))
+
+##Reset Indexing
+rownames(reformatted_freight) <- 1:nrow(reformatted_freight)
+
+
+
+###############################Truck and Trailer - Economics-M#########################################
+economics <- data.frame(t(read_excel("Truck & Trailer Database July 2020.xlsx", sheet = "economics-m", na = c("", "n/a"))), stringsAsFactors = F)
+
+##Create Date Column
+economics$date <- ymd(paste(economics$X1, economics$X2, "1"))
+
+##Change Headers
+names(economics) <- economics[3, ]
+names(economics)[ncol(economics)] <- "Date"
+
+##Remove top empty rows
+economics <- economics[!is.na(economics[, ncol(economics)]), ]
+
+##Remove empty columns
+economics <- economics[colSums(!is.na(economics))>0]
+
+##Select our desired columns
+reformatted_economics <- cbind(economics$Date, economics[, 3:(ncol(economics)-1)])
+names(reformatted_economics)[1] <- "Date"
+
+##Change character type columns to numeric type
+reformatted_economics <- cbind(reformatted_economics[1]
+                             ,sapply(reformatted_economics[2:ncol(reformatted_economics)], function(y) as.numeric(y)))
+
+##Reset Indexing
+rownames(reformatted_economics) <- 1:nrow(reformatted_economics)
+
+
+
+
+###############################Truck and Trailer - Indicators-M#########################################
+indicators <- data.frame(t(read_excel("Truck & Trailer Database July 2020.xlsx", sheet = "indicators-m", na = c("", "n/a"))), stringsAsFactors = F)
+
+indicators <- indicators[1:80]
+
+holder1 <- NA
+holder2 <- NA
+for (i in 3:which(indicators[3,] == "Class 4, North America")-1){
+  if (!is.na(indicators[3, i])){
+    if (is.na(indicators[3, i-1])){
+      holder2 <- indicators[3, i]
+      indicators[3, i] <- paste(holder1, "-", indicators[3, i])
+    }
+    else{
+      indicators[3, i] <- paste(holder1, "-", holder2, indicators[3, i])
+    }
+  }
+  
+  else if (!is.na(indicators[2, i])){
+    holder1 <- indicators[2, i]
+  }
+}
+
+for (i in which(indicators[3,] == "Class 4, North America"):ncol(indicators)-1){
+  if (is.na(indicators[3, i-1])){
+    if (!is.na(indicators[3, i+1])){
+      holder1 <- indicators[3, i]
+    }
+  }
+  if (!is.na(indicators[3, i])){
+      indicators[3, i] <- paste(holder1, "-", indicators[3, i])
+  }
+}
+
+##Create Date Column
+indicators$date <- ymd(paste(indicators$X1, indicators$X2, "1"))
+
+##Change Headers
+names(indicators) <- indicators[3, ]
+names(indicators)[ncol(indicators)] <- "Date"
+
+##Remove top empty rows
+indicators <- indicators[!is.na(indicators[, ncol(indicators)]), ]
+
+##Remove empty columns
+indicators <- indicators[colSums(!is.na(indicators))>0]
+
+##Select our desired columns
+reformatted_indicators <- cbind(indicators$Date, indicators[, 3:(ncol(indicators)-1)])
+names(reformatted_indicators)[1] <- "Date"
+
+##Change character type columns to numeric type
+reformatted_indicators <- cbind(reformatted_indicators[1]
+                               ,sapply(reformatted_indicators[2:ncol(reformatted_indicators)], function(y) as.numeric(y)))
+
+##Reset Indexing
+rownames(reformatted_indicators) <- 1:nrow(reformatted_indicators)
+
+
+
+
+###################################Merge Economic and Truck Datasets####################################
+exogenous <- merge(reformatted_summary, reformatted_rates, all = T ,by = "Date")
+exogenous <- merge(exogenous, reformatted_freight, all = T ,by = "Date")
+exogenous <- merge(exogenous, reformatted_economics, all = T ,by = "Date")
+exogenous <- merge(exogenous, reformatted_indicators, all = T ,by = "Date")
+
+
+###########################Create a Dictionary that points variables to source########################
+source <- cbind(names(reformatted_summary)[2:ncol(reformatted_summary)], "Intermodal - Summary-M")
+source <- rbind(source, cbind(names(reformatted_rates)[2:ncol(reformatted_rates)], "Intermodal - Rates-M"))
+source <- rbind(source, cbind(names(reformatted_freight)[2:ncol(reformatted_freight)], "Intermodal - Freights-M"))
+source <- rbind(source, cbind(names(reformatted_economics)[2:ncol(reformatted_economics)], "Intermodal - Economics-M"))
+source <- rbind(source, cbind(names(reformatted_indicators)[2:ncol(reformatted_indicators)], "Intermodal - Indicators-M"))
+source <- data.frame(source)
+names(source) <- c("XVar", "Source")
+
+
+###################################### Reformatting Sales By Department##################################
+sales <- data.frame(read_excel("Labelmaster Sales By Dept (Expanded).xlsx", sheet = "Sales By Month & Dept (no Obex)", na = c("","n/a")), stringsAsFactors = F)
+
+##Selecting the right table in the worksheet
+sales <- sales[, (which(is.na(sales[1,]))+1):ncol(sales)]
+names(sales) <- sales[1, ]
+sales <- sales[-1, ]
+sales <- sales[!is.na(sales$TheYear), ]
+
+##Create Data Column
+sales$Date <- ymd(paste(sales$TheYear, sales$TheMonth, "1"))
+
+##Changing table format from long to wide
+sales <- sales[, 3:ncol(sales)]
+sales <- spread(sales, DeptDesc, DeptSales)
+
+##Remove Seals
+sales <- sales[, names(sales) != "Seals"]
+
+##Change character type columns to numeric type
+sales <- cbind(sales[1], sapply(sales[2:ncol(sales)], function(y) as.numeric(y)))
+
+
+##Add missing rows
+sales_final <- merge(sales, exogenous, by = "Date", all.y = TRUE)
+sales_final <- sales_final[which(sales_final$Date == min(sales$Date)):which(sales_final$Date == max(sales$Date)),
+                           1:ncol(sales)]
+
+for (i in 2:ncol(sales_final)){
+  na_pointer <- which(is.na(sales_final[i]))
+  if (length(na_pointer) > 0){
+    for (j in na_pointer){
+      sales_final[j, i] <- sum(sales_final[j-1, i], sales_final[j+1, i])/2
+    }
+  }
+}
+
+for (i in 2:ncol(sales_final)){
+  na_pointer <- which(is.na(sales_final[i]))
+  if (length(na_pointer) > 0){
+    for (j in na_pointer){
+      sales_final[j, i] <- sum(sales_final[j-1, i], sales_final[j+2, i])/2
+    }
+  }
+}
+
+##Export Reformatted Datasets
+write.csv(sales_final,"sales.csv")
+write.csv(exogenous,"exogenous.csv")
+write.csv(source,"source.csv")
+
+##Create an data frame of differenced exogenous variables
+xvar_diff <- data.frame(sapply(exogenous[, 2:ncol(exogenous)], function(y) diff(y, k=1)))
+xvar_reformed <- cbind(exogenous$Date[2:nrow(exogenous)], xvar_diff)
+names(xvar_reformed)[1] <- "Date"
+write.csv(xvar_reformed, "xvar_diff.csv")
+
+
+##Create an data frame of differenced sales variables
+yvar_diff <- data.frame(sapply(sales_final[, 2:ncol(sales_final)], function(y) diff(y, k=1)))
+yvar_reformed <- cbind(sales_final$Date[2:nrow(sales_final)], yvar_diff)
+names(yvar_reformed)[1] <- "Date"
+write.csv(yvar_reformed, "yvar_diff.csv")
+
+# Final_Model
+
+library(lubridate)
+library(plyr)
+library(readxl)
+library(tidyr)
+library(tseries)
+library(forecast)
+setwd('/Users/Sunny/IIT Data Correlation Project 2')
+xvar_simp <- read.csv("exogenous.csv", row.names = 1)
+xvar_diff <- read.csv("xvar_diff.csv", row.names = 1)
+xvar_simp_select <- read.csv("xvar_1_select.csv", row.names = 1)
+xvar_diff_select <- read.csv("xvar_2_select.csv", row.names = 1)
+xvar_diff_select_2 <- read.csv("xvar_3_select.csv", row.names = 1)
+yvar <- read.csv("yvar_diff.csv", row.names = 1)
+y <- read.csv("sales.csv", row.names = 1)
+
+##Reformat date to date datatype
+xvar_simp$Date <- ymd(xvar_simp$Date)
+xvar_diff$Date <- ymd(xvar_diff$Date)
+yvar$Date <- ymd(yvar$Date)
+y$Date <- ymd(y$Date)
+
+##Set when to start forecasting for yvar
+yvar <- yvar[1:(nrow(yvar)-0), ]
+
+##What is the latest entry for sales
+final_date <- max(yvar$Date)
+
+##Add NA entries for forecasting yvar later
+yvar_final <- rbind.fill(yvar, data.frame(Date = c(final_date %m+% months(1), final_date %m+% months(2), final_date %m+% months(3))))
+
+##Trim xvar to match yvar
+xvar_simp_trim <- merge(xvar_simp, yvar_final, by = "Date", all.y = T)
+xvar_simp_trim <- xvar_simp_trim[, 1:ncol(xvar_simp)]
+xvar_simp_trim <- xvar_simp_trim[, !is.na(xvar_simp_trim[1,])]
+
+xvar_diff_trim <- merge(xvar_diff, yvar_final, by = "Date", all.y = T)
+xvar_diff_trim <- xvar_diff_trim[, 1:ncol(xvar_diff)]
+xvar_diff_trim <- xvar_diff_trim[, !is.na(xvar_diff_trim[1,])]
+
+
+x_forecast <- function(x){
+  for(i in 2:ncol(x)){
+    na <- which(is.na(x[, i]))
+    print(na)
+    if (length(na) > 0){
+      lower <- min(na)
+      upper <- max(na)
+      na_range <- upper - lower + 1
+      input <- ts(x[, i], start = c(year(min(x$Date)), month(min(x$Date))), 
+                  end = c(year(x$Date[lower-1]), month(x$Date[lower-1])), frequency = 12)
+      model <- auto.arima(input, ic = "aic")
+      result <- forecast(model, level = c(95), h = na_range)
+      result$mean[1]
+      for (j in 1:na_range){
+        x[lower + j - 1, i] <- result$mean[j]
+      }
+      
+    }
+  }
+  return(x)
+}
+
+##Forecasting xvar
+xvar_simp_forecast <- x_forecast(xvar_simp_trim)
+xvar_diff_forecast <- x_forecast(xvar_diff_trim)
+write.csv(x_simp_forecast, "xvar_1_forecast.csv")
+write.csv(x_diff_forecast, "xvar_2_forecast.csv")
+write.csv(x_diff_forecast, "xvar_2.2_forecast.csv")
+xvar_simp_forecast <- read.csv("xvar_1_forecast.csv", row.names = 1)
+xvar_diff_forecast <- read.csv("xvar_2_forecast.csv", row.names = 1)
+
+y_forecast <- function (y, x, selected_x){
+  for(i in 2:ncol(y)){
+    na <- which(is.na(y[, i]))
+    if (length(na) > 0){
+      lower <- min(na)
+      upper <- max(na)
+      na_range <- upper - lower + 1
+      y_ts <- ts(y[1:(upper - na_range), i], start = c(year(min(y$Date)), month(min(y$Date))), 
+                  end = c(year(y$Date[lower-1]), month(y$Date[lower-1])), frequency = 12)
+      model <- auto.arima(y_ts, ic = "aic")
+      coef <- model$arma
+      
+      final_model <- Arima(y_ts, order = c(coef[1],coef[6],coef[2]), 
+                           seasonal=list(order=c(coef[3],coef[7],coef[4]), period = coef[5]), 
+                           xreg = as.matrix(x[1:(upper - na_range), unlist(selected_x[i, ])]))
+      pred <- predict(final_model, n.ahead = na_range, newxreg = as.matrix(x[lower:upper, unlist(selected_x[i, ])]))
+      for (j in 1:na_range){
+        y[lower + j - 1, i] <- pred$pred[[j]]
+      }
+    }
+  }
+  return(y)
+}
+
+yvar_simp_forecast <- y_forecast(yvar_final, xvar_simp_forecast, xvar_simp_select)
+yvar_diff_forecast <- y_forecast(yvar_final, xvar_diff_forecast, xvar_diff_select)
+yvar_diff_forecast_2 <- y_forecast(yvar_final, xvar_diff_forecast, xvar_diff_select_2)
+
+write.csv(yvar_simp_forecast, "yvar_simp_forecast.csv")
+write.csv(yvar_diff_forecast, "yvar_diff_forecast.csv")
+
+a <- read.csv("yvar_simp_forecast.csv", row.names = 1)
+b <- read.csv("yvar_diff_forecast.csv", row.names = 1)
+
+##Convert y_diff back to actual sales number
+yvar_undiff <- rbind(y[1,], yvar_diff_forecast_2)
+rownames(yvar_undiff) <- NULL
+
+for (j in 2:ncol(yvar_undiff)){
+  for (i in 2:nrow(yvar_undiff)){
+    yvar_undiff[i, j] <- yvar_undiff[i, j] + yvar_undiff[i-1, j]
+  }
+}
+
+
+
+yvar_undiffed <- sapply(yvar_undiffed[2,nrow(yvar_undiffed):])
+write.csv(yvar_diff_forecast_2, "yvar_diff_forecast_2.csv")
+
+
+
+
+##Attempt at predicting only using past data
+xvar_simp_onemonth <- xvar_simp
+xvar_simp_twomonth <- xvar_simp
+xvar_simp_threemonth <- xvar_simp
+xvar_simp_onemonth$Date <- xvar_simp_onemonth$Date %m+% months(1)
+xvar_simp_twomonth$Date <- xvar_simp_twomonth$Date %m+% months(2)
+xvar_simp_threemonth$Date <- xvar_simp_threemonth$Date %m+% months(3)
+
+x_all <- list(xvar_simp_onemonth, xvar_simp_twomonth, xvar_simp_threemonth)
+
+
+y_forecast_nox <- function (y, x, selected_x){
+  start_date <- min(y$Date)
+  for(i in 2:ncol(y)){
+    na <- which(is.na(y[, i]))
+    if (length(na) > 0){
+      lower <- min(na)
+      upper <- max(na)
+      na_range <- upper - lower + 1
+      y_ts <- ts(y[1:(upper - na_range), i], start = c(year(min(y$Date)), month(min(y$Date))), 
+                 end = c(year(y$Date[lower-1]), month(y$Date[lower-1])), frequency = 12)
+      model <- auto.arima(y_ts, ic = "aic")
+      coef <- model$arma
+      for (j in 1:na_range){
+        final_model <- Arima(y_ts, order = c(coef[1],coef[6],coef[2]), 
+                             seasonal=list(order=c(coef[3],coef[7],coef[4]), period = coef[5]), 
+                             xreg = as.matrix(x[[j]][which(x[[j]]$Date == start_date):which(x[[j]]$Date == y$Date[upper - na_range]), unlist(selected_x[i, ])]))
+        print(j)
+        pred <- predict(final_model, n.ahead = j, newxreg = as.matrix(x[[j]][which(x[[j]]$Date == y$Date[lower]):which(x[[j]]$Date == y$Date[lower+j-1]), unlist(selected_x[i, ])]))
+        y[lower + j - 1, i] <- pred$pred[[j]]
+      }
+    }
+  }
+  return(y)
+}
+
+yvar_nox_forecast <- y_forecast_nox(yvar_final, x_all, xvar_simp_select)
+
+# LSTM R Shiny App 
+
+#
+# This is a Shiny web application. You can run the application by clicking
+# the 'Run App' button above.
+#
+# Find out more about building applications with Shiny here:
+#
+#    http://shiny.rstudio.com/
+#
+
+library(shiny)
+
+# Define UI for application that draws a histogram
+ui <- fluidPage(
+
+    # Application title
+    titlePanel("Old Faithful Geyser Data"),
+
+    # Sidebar with a slider input for number of bins 
+    sidebarLayout(
+        sidebarPanel(
+            sliderInput("bins",
+                        "Number of bins:",
+                        min = 1,
+                        max = 50,
+                        value = 30)
+        ),
+
+        # Show a plot of the generated distribution
+        mainPanel(
+           plotOutput("distPlot")
+        )
+    )
+)
+
+# Define server logic required to draw a histogram
+server <- function(input, output) {
+
+    output$distPlot <- renderPlot({
+        # generate bins based on input$bins from ui.R
+        x    <- faithful[, 2]
+        bins <- seq(min(x), max(x), length.out = input$bins + 1)
+
+        # draw the histogram with the specified number of bins
+        hist(x, breaks = bins, col = 'darkgray', border = 'white')
+    })
+}
+
+# Run the application 
+shinyApp(ui = ui, server = server)
