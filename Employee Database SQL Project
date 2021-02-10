@@ -1,0 +1,950 @@
+ERP User SQL Code:
+
+**This code creates basic dummy users for testing purposes**
+
+create user admin1 with password 'admin';
+grant admin to admin1;
+create user engi1 with password 'engineer';
+grant engineer to engi1;
+create user hr1 with password 'hr';
+grant hr to hr1;
+create user sales1 with password 'sales';
+grant sales to sales1;
+
+****creating table entries for test users****
+
+insert into employee values(1,'Florence','Price',11111111,0,100000,'admin');
+insert into users(userid,privilege,eid) values('admin1','admin',1);
+
+insert into employee values(2,'Antonia','Mckinney',11111112,0,80000,'hr');
+insert into users(userid,privilege,eid) values('hr1','hr',2);
+
+insert into employee values(3,'Camille','Lynch',11111113,0,80000,'engineer');
+insert into users(userid,privilege,eid) values('engi1','engineer',3);
+
+insert into employee values(4,'Edna','Curtis',11111114,1,20.50,'sales');
+insert into users(userid,privilege,eid) values('sales1','sales',4);
+
+** miscellaneous permissions **
+grant insert,update on orders,modelorder,customer to sales;
+grant insert,update on employee to hr;
+grant insert,update on model,part,item to engineer;
+alter role admin with createrole;
+
+***This code creates a view showing the role of the current user, available to all users***
+
+create view currentuser_role as 
+with roleMember as (select oid, rolname from pg_authid)
+select rolname from pg_auth_members,roleMember where roleMember.oid=pg_auth_members.roleid and pg_auth_members.member=(select oid from current_user,roleMember where current_user=rolname);
+
+create user timer with password 'timer';
+grant update,select,insert on user to timer;
+
+***fill in the tables with some test data***
+***(author: rafika momin)***
+
+Insert into Item values ('a754', 90, 70, 5, 'tool');
+Insert into Item values ('b134', 34, 45, 15, 'tool');
+Insert into Item values ('c638', 65, 62, 65, 'connector');
+Insert into Item values ('d189', 59, 34, 87, 'panel');
+Insert into Item values ('e873', 23, 87, 200, 'connector');
+Insert into Item values ('f374', 86, 24, 54, 'panel');
+
+Insert into Model values ('346', 90);
+Insert into Model values ('673', 123);
+Insert into Model values ('992', 85);
+Insert into Model values ('624', 290);
+Insert into Model values ('873', 345);
+
+Insert into Customer values ('356', 'Linda', 'Grove');
+Insert into Customer values ('832', 'Sam', 'Smith');
+Insert into Customer values ('187', 'Taylor', 'Nicholson');
+Insert into Customer values ('325', 'Miranda', 'Johnson');
+Insert into Customer values ('476', 'Patricia', 'Brown');
+
+Insert into Employee values ('732', 'Emma', 'Watson', 345652341, 1, 20.50, 'sales');
+Insert into Employee values ('826', 'Harry', 'Potter', 980652337, 0, 78000, 'sales');
+insert into employee values('116','Patrick','Donald',580687332,0,56000,'hr');
+Insert into Employee values ('246', 'Rebecca', 'Cranne', 620687221, 1, 20.50, 'engineer');
+Insert into Employee values ('786', 'Harry', 'Styles', 422679783, 1, 20.50, 'sales');
+
+Insert into Orders values ('013', 345, '187', '116');
+Insert into Orders values ('163', 245, '325', '246');
+Insert into Orders values ('546', 98, '832', '246');
+Insert into Orders values ('022', 250, '356', '786');
+Insert into Orders values ('839', 145, '476', '116');
+
+Insert into ModelOrder values ('013', '992', 1);
+Insert into ModelOrder values ('163', '624', 2);
+Insert into ModelOrder values ('546', '873', 1);
+Insert into ModelOrder values ('022', '673', 1);
+Insert into ModelOrder values ('022', '873', 1);
+
+Insert into Part values ('992', 'd189');
+Insert into Part values ('624', 'a754');
+Insert into Part values ('624', 'b134');
+Insert into Part values ('873', 'b134');
+Insert into Part values ('673', 'f374');
+
+***create some views***
+
+create view totalrevenue as select sum(saleValue) from Orders;
+create view totalrevenuebyemp as select eID, sum(saleValue) from Orders group by eID;
+create view totalrevenuebycust as select cID, sum(saleValue) from Orders group by cID;
+grant select on totalrevenue to admin;
+grant select on totalrevenue to sales;
+grant select on totalrevenuebyemp to admin;
+grant select on totalrevenuebyemp to sales;
+grant select on totalrevenuebycust to admin;
+grant select on totalrevenuebycust to sales;
+
+create view saleshistory with empsale as (select orderid,salevalue,eid,employee.firstname as e_firstname,employee.lastname as e_lastname,cid from orders natural join employee)
+select * from customer natural join empsale;
+
+create view customerModel as select mid, sum(quantity) from modelorder group by mid;
+grant select on customerModel,saleshistory to admin;
+grant select on customerModel,saleshistory to sales;
+
+create view inventoryusage as select orderid,modelorder.mid,part.iid,item.quantity from (modelorder left join model on modelorder.mid=model.mid),(part natural join item) where model.mid=part.mid;
+
+grant select on inventoryUsage to admin;
+grant select on inventoryUsage to engineer; 
+
+create view expensereportsalary as select eid, pay, isHourly from Employee;
+create view expensereportitem as select iid, cost, quantity from Item;
+create view expensereportsalarytotal as select sum (pay) from Employee where isHourly=0;
+create view expensereportitemtotal as select sum (cost*quantity) from Item;
+
+grant select on expensereportsalary to admin;
+grant select on expensereportitem to admin;
+grant select on expensereportsalarytotal to admin;
+grant select on expensereportitemtotal to admin;
+
+ERP App JAVA Code:
+
+package erp;
+
+import java.math.BigDecimal;
+import java.sql.*;
+import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.Scanner;
+
+public class ERPapp {
+	
+	static Scanner userInput; //detect user input
+	static Connection conn;   //database connection for queries, updates
+	static String role;		  //get permissions
+	static String userID;
+	
+	//list of attributes requiring integer or decimal/numeric values
+	static String[] intAttributes = new String[] {"ishourly","quantity","ssn"};
+	static String[] decAttributes = new String[] {"cost","leadtime","pay","saleprice","salevalue"};
+
+	/* 
+	 * (1) create basic system for user to view tables, i.e. prompt user
+	 * for tables to view or update, user input values, etc, and translate 
+	 * into SQL statements to pass into the db. 
+	 * (2) create analytics reports for admin access. Aggregate data to make
+	 * some nice formatted summary reports.
+	 * 
+	 * see methods for details
+	*/
+	public static void main(String[] args) throws SQLException 
+	{ 
+		// Welcome text and prompt user to login
+		userInput = new Scanner(System.in);
+		System.out.println("User login for management system. Please enter "
+				+ "your credentials.");
+		System.out.print("ID: ");
+		userID=userInput.nextLine();
+		System.out.print("Password: ");
+		String userPass=userInput.nextLine();
+		try 
+		{ 
+			conn = DriverManager.getConnection(
+					"jdbc:postgresql://localhost:5432/erp",userID,userPass); 
+			updateUserRole();
+			updateTime(true);
+			String selection;
+			System.out.println("\nWelcome user "+userID+". What would you like to do? \n"
+					+ "===============================================");
+			do {
+			selection = userMenu();
+			execute(selection);
+			}
+			while(!selection.equals("Q"));
+			updateTime(false);
+			conn.close(); // close Connection and release resources 
+		} 
+		catch (SQLException sqle) 
+		{ 
+			System.out.println("SQLException : " + sqle); // handle exceptions 
+		}
+	}
+	
+	/* 
+	 * Update the role instance variable to the current connection's role
+	 */
+	private static void updateUserRole()
+	{
+		try 
+		{
+			Statement getRole = conn.createStatement();
+			ResultSet roleTable = getRole.executeQuery("select * from currentUser_role;");
+			roleTable.next();
+			role = roleTable.getString(1);
+			getRole.close();
+		} 
+		catch (SQLException sqle) 
+		{ 
+			System.out.println("SQLException : " + sqle); // handle exceptions 
+		}
+	}
+	
+	/* 
+	 * Update the users table with current time of login/logout
+	 * Outcome:
+	 * 		login==true, update login column
+	 * 		login==false, update logout column
+	 */
+	private static void updateTime(boolean login)
+	{
+		try 
+		{
+			Connection timeConn = DriverManager.getConnection(
+					"jdbc:postgresql://localhost:5432/erp","timer","timer");
+			String attribute;
+			if(login)
+				attribute="logintime";
+			else
+				attribute="logouttime";
+			Statement updateTime = timeConn.createStatement();
+			updateTime.executeUpdate("update users set "+ attribute 
+				+ "= localtimestamp where userid='" +userID+ "';");
+			updateTime.close();	
+			timeConn.close();
+		} 
+		catch (SQLException sqle) 
+		{ 
+			System.out.println("SQLException : " + sqle); // handle exceptions 
+		}
+	}
+	
+	/*
+	 * Print the menu specific to each user role and return the user's 
+	 * selected action.
+	 */
+	private static String userMenu()
+	{
+		System.out.println();
+		String selection = "";
+		if(role.equals("admin"))
+		{
+		System.out.println("Type VIEW to view database information \n"
+				+ "Type CREATE EMPLOYEE to create employee \n"
+				+ "Type SETUP to set up tables \n"
+				+ "Type UPDATE to update the database \n"
+				+ "Type GRANT to grant access \n"
+				+ "Type REPORT to access a business report \n"
+				+ "Type Q to quit");
+		}
+		else if(role.equals("sales"))
+		{
+		System.out.println("Type VIEW to view customer and order information \n"
+				+ "Type UPDATE to update customer info \n"
+				+ "Type NEW to add new order information \n"
+				+ "Type REPORT to access sales reports \n"
+				+ "Type Q to quit");
+		}
+		else if(role.equals("engineer"))
+		{
+		System.out.println("Type VIEW to view model, inventory, and employee information  \n"
+				+ "Type NEW to add new model and inventory information \n"
+				+ "Type UPDATE to update model and inventory information \n"
+				+ "Type REPORT to access inventory report \n"
+				+ "Type Q to quit");
+		}
+		else if(role.equals("hr"))
+		{
+		System.out.println("Type VIEW to view employee information \n"
+				+ "Type CREATE EMPLOYEE to create employee \n"
+				+ "Type UPDATE to update employee information \n"
+				+ "Type Q to quit");
+		}
+		selection=userInput.nextLine().toUpperCase();
+		return selection;
+	}
+	
+	/* 
+	 * Execute the user's selected action
+	 */
+	private static void execute(String selection)
+	{
+		if(selection.equals("VIEW"))
+		{
+			System.out.println("\nView tables: ");
+			printVisTableList("select");
+			System.out.print("Type your selection: ");
+			String tableToView=userInput.nextLine();
+			view(matchTable(tableToView));
+		}
+		else if(selection.equals("CREATE EMPLOYEE"))
+		{
+			System.out.println("\nAdding an employee to the database.");
+			addEmployee();
+		}
+		else if(selection.equals("SETUP") || selection.equals("NEW"))
+		{
+			System.out.println("\nAdding values to the database.");
+			printVisTableList("insert");
+			System.out.print("Type your selection: ");
+			String tableToInsert=userInput.nextLine();
+			insert(matchTable(tableToInsert));
+		}
+		else if(selection.equals("GRANT"))
+		{
+			System.out.println("\nGranting access to user.");
+			System.out.print("Type the user name: ");
+			String userToGrant=userInput.nextLine();
+			System.out.println("Type the desired role: (admin, sales, hr, engineer)");
+			String roleToGrant=userInput.nextLine();
+			grant(userToGrant,roleToGrant);
+		}
+		else if(selection.equals("UPDATE"))
+		{
+			System.out.println("\nUpdating the database.");
+			printVisTableList("update");
+			System.out.print("Type your selection: ");
+			String tableToUpdate=userInput.nextLine();
+			try {
+				update(matchTable(tableToUpdate));
+			}
+			catch (SQLException sqle) { 
+				System.out.println("SQLException : " + sqle); // handle exceptions 
+			}
+		}
+		else if(selection.equals("REPORT"))
+		{
+			System.out.println("Options:");
+			if(role.contentEquals("admin"))
+			{
+				System.out.println("SALES REPORT");
+				System.out.println("CUSTOMER SALES");
+				System.out.println("INVENTORY USAGE");
+				System.out.println("EXPENSE REPORT");
+			}
+			else if (role.contentEquals("sales"))
+			{
+				System.out.println("SALES REPORT");
+				System.out.println("CUSTOMER SALES");
+			}
+			else if(role.contentEquals("engineer"))
+			{
+				System.out.println("INVENTORY USAGE");
+			}
+			System.out.print("Type your selection: ");
+			String reportSelection=userInput.nextLine().toUpperCase();
+			System.out.println();
+			if(reportSelection.contentEquals("SALES REPORT"))
+				salesReport();
+			else if(reportSelection.contentEquals("CUSTOMER SALES"))
+				trendReport();
+			else if(reportSelection.contentEquals("INVENTORY USAGE"))
+				inventoryUsageReport();
+			else if(reportSelection.contentEquals("EXPENSE REPORT"))
+				expenseReport();
+		}
+	}
+	
+	/*
+	 * Print the visible tables for the active user for specific privileges
+	 * (e.g. select, insert, update)
+	 */
+	private static void printVisTableList(String privilege) {
+		try 
+		{
+			Statement tableQuery = conn.createStatement();
+			ResultSet tables = tableQuery.executeQuery(
+					"select table_name from information_schema.role_table_grants "
+					+ "where grantee='"+role+"' and privilege_type='"
+					+ privilege.toUpperCase()+"';");
+			while(tables.next())
+			{
+				String tableName = tables.getString(1).toUpperCase();
+				if(matchTable(tableName).length()>0)
+					System.out.println(matchTable(tableName).toUpperCase());
+			}
+			tableQuery.close();
+		} 
+		catch (SQLException sqle) 
+		{ 
+			System.out.println("SQLException : " + sqle); // handle exceptions 
+		}
+	}
+	
+	/*
+	 * Grant access to a user (admin only functionality)
+	 */
+	private static void grant(String userToGrant, String roleToGrant)
+	{
+		try 
+		{
+			Statement grantStmt = conn.createStatement();
+			grantStmt.execute("grant "+ roleToGrant +" to "+userToGrant+";");
+			grantStmt.close();
+		} 
+		catch (SQLException sqle) 
+		{ 
+			System.out.println("SQLException : " + sqle); // handle exceptions 
+		}
+	}
+
+	/* 
+	 * Allow user to view (select) tables they have access to. 
+	 * Input: table name (e.g. "model" "customer" etc.)
+	 * Output: print table contents to screen
+	 */
+	public static void view(String table)
+	{
+		try 
+		{
+			Statement select = conn.createStatement();
+			ResultSet tuples = select.executeQuery("select * from "+table+";");;
+			printTable(tuples);
+			select.close();
+		} 
+		catch (SQLException sqle) 
+		{ 
+			System.out.println("SQLException : " + sqle); // handle exceptions 
+		}
+	}
+	
+	/*
+	 * Given a ResultSet from a query, print a nicely formatted table.
+	 */
+	private static void printTable(ResultSet rs) {
+		try {
+			ResultSetMetaData metadata = rs.getMetaData();
+			int numcols=metadata.getColumnCount();
+			for(int i=1;i<=numcols;i++)
+				System.out.print(fillSpace(metadata.getColumnName(i))+"  ");
+			System.out.println();
+			while(rs.next())
+			{
+				String entry = "";
+				for(int i=1;i<=numcols;i++)
+					entry += fillSpace(rs.getString(i))+"  ";
+				System.out.println(entry);
+			}
+		}
+		catch (SQLException sqle) 
+		{ 
+			System.out.println("SQLException : " + sqle); // handle exceptions 
+		}
+	}
+	
+	
+	//helper method to format columns nicely 
+	private static String fillSpace(String input)
+	{
+		if(input==null)
+			input="";
+		if(input.length()>12)
+			return input.substring(0,12);
+		int numspace = 12 - input.length() % 12;
+		String output = input;
+		for(int i=0;i<numspace;i++)
+			output+=" ";
+		return output;
+	}
+	
+	//helper method to match the table strings. Avoids injection errors
+	private static String matchTable(String input)
+	{
+		if(input.toLowerCase().contentEquals("orders"))
+			return "orders";
+		else if(input.toLowerCase().contentEquals("model"))
+			return "model";
+		else if(input.toLowerCase().contentEquals("item"))
+			return "item";
+		else if(input.toLowerCase().contentEquals("modelorder"))
+			return "modelorder";
+		else if(input.toLowerCase().contentEquals("employee"))
+			return "employee";
+		else if(input.toLowerCase().contentEquals("customer"))
+			return "customer";
+		else if(input.toLowerCase().contentEquals("part"))
+			return "part";
+		else if(input.toLowerCase().contentEquals("users"))
+			return "users";
+		else if(input.toLowerCase().contentEquals("employeebasicinfo"))
+			return "employeebasicinfo";
+		else
+			return "";
+	}
+	
+	//return a list of all the attributes of a table
+	private static LinkedList<String> attributeList(String table)
+	{
+		LinkedList<String> attributes = new LinkedList<String>();
+		try {
+			DatabaseMetaData dbmd = conn.getMetaData();
+			ResultSet rs = dbmd.getColumns("", "", table, "");
+			while(rs.next())
+				attributes.add(rs.getString("COLUMN_NAME"));
+		}
+		catch (SQLException sqle) 
+		{ 
+			System.out.println("SQLException : " + sqle); // handle exceptions 
+		}
+		return attributes;
+	}
+	
+	/* 
+	 * Allow user to update information in tables they have access to. 
+	 * Prompt user for values needed
+	 */
+	public static void update(String table) throws SQLException
+	{
+		//admin can update all tables: employee, user, sales, enginner, hr, order, model, and item
+		//sales can update tables: customer and order 
+		//engineer can update tables: item and model
+		//hr can only update the employee table
+		if(table.equals("employee") && ((role.equals("admin") || role.equals("hr")) ))
+		{ //only admin and sales. 
+			System.out.println("Enter employee ID number: ");
+			String eID = userInput.nextLine();
+			System.out.println("Which attribute would you like to update?");
+			System.out.println(attributeList(table).toString());
+			String attributeUpdate = userInput.nextLine();
+			do {
+				System.out.println("Enter the new value for the attribute: ");
+				String newValue = userInput.nextLine();
+				PreparedStatement employeeUpdate = conn.prepareStatement("update employee set " 
+						+ attributeUpdate +  "=? where eID = ?;");
+				employeeUpdate.setString(2,eID);
+				if(dataType(attributeUpdate).equals("string"))
+					employeeUpdate.setString(1,newValue);
+				else if(dataType(attributeUpdate).equals("int"))
+					employeeUpdate.setInt(1, Integer.valueOf(newValue));
+				else if(dataType(attributeUpdate).equals("numeric"))
+					employeeUpdate.setBigDecimal(1, new BigDecimal(newValue));
+				
+				int i = employeeUpdate.executeUpdate();
+				employeeUpdate.close();
+				//letting user know update was successful
+				if(i > 0) {
+					System.out.println("Update successful.");
+				}else {
+					System.out.println("Update failed.");
+				}
+				employeeUpdate.close();
+				System.out.println("Enter another attribute, or type X to exit. ");
+				System.out.println(attributeList(table).toString());
+				attributeUpdate = userInput.nextLine();
+			}
+			while(!attributeUpdate.toLowerCase().equals("x"));
+		}
+		//disallow some attribute updates
+		else if(table.equals("users") && role.equals("admin")) 
+		{ //only admin
+			System.out.println("Enter user ID: ");
+			String userID = userInput.nextLine();
+			System.out.println("Which attribute would you like to update? ");
+			System.out.println(attributeList(table).toString());
+			String attributeUpdate = userInput.nextLine();
+			do {
+				if(attributeUpdate.contentEquals("logintime") || 
+						attributeUpdate.contentEquals("logouttime"))
+					System.out.println("Cannot edit timestamp data.");
+				else
+				{
+					System.out.println("Enter the new value for the attribute: ");
+					String newValue = userInput.nextLine();
+					PreparedStatement userUpdate = conn.prepareStatement("update users set " 
+							+ attributeUpdate + "= ? where userID = ?;");
+					userUpdate.setString(1,newValue);
+					userUpdate.setString(2,userID);
+				
+					int i = userUpdate.executeUpdate();
+					//letting user know update was successful
+					if(i != 0) {
+						System.out.println("Update successful.");
+					}else {
+						System.out.println("Update failed.");
+					}
+					userUpdate.close();
+				}
+				System.out.println("Enter another attribute, or type X to exit. ");
+				System.out.println(attributeList(table).toString());
+				attributeUpdate = userInput.nextLine();
+			}
+			while(!attributeUpdate.toLowerCase().equals("x"));
+		}
+		else if(table.equals("orders") || table.equals("model") ||
+				table.equals("item") || table.equals("customer"))
+		{	//one primary key
+			String pkeyname;
+			if(table.equals("orders"))
+				pkeyname="orderid";
+			else if(table.equals("model"))
+				pkeyname="mid";
+			else if(table.equals("customer"))
+				pkeyname="cid";
+			else 
+				pkeyname="iid";
+			System.out.println("Enter "+table+" ID:");
+			String orderID = userInput.nextLine();
+			System.out.println("Which attribute would you like to update? ");
+			System.out.println(attributeList(table).toString());
+			String attributeUpdate = userInput.nextLine();
+			do
+			{
+				System.out.println("Enter the new value for the attribute: ");
+				String newValue = userInput.nextLine();
+			
+				PreparedStatement salesUpdate = conn.prepareStatement("update " + table
+						+ " set " + attributeUpdate +  " = ? where "+pkeyname+" = ?;");
+				if(dataType(attributeUpdate).equals("string"))
+					salesUpdate.setString(1,newValue);
+				else if(dataType(attributeUpdate).equals("int"))
+					salesUpdate.setInt(1, Integer.valueOf(newValue));
+				else if(dataType(attributeUpdate).equals("numeric"))
+					salesUpdate.setBigDecimal(1, new BigDecimal(newValue));
+				salesUpdate.setString(2,orderID);
+			
+				int i = salesUpdate.executeUpdate();
+				//letting user know update was successful
+				if(i != 0) {
+					System.out.println("Update successful.");
+				}else {
+					System.out.println("Update failed.");
+				}
+				System.out.println("Enter another attribute, or type X to exit. ");
+				System.out.println(attributeList(table).toString());
+				attributeUpdate = userInput.nextLine();
+			}
+			while(!attributeUpdate.toLowerCase().equals("x"));
+		}
+		else if(table.equals("modelorder") || table.equals("part"))
+		{	//two primary keys
+			String pkeyname1,pkeyname2;
+			if(table.equals("modelorder"))	{
+				pkeyname1="orderid";
+				pkeyname2="mid";
+			}
+			else 	{
+				pkeyname1="mid";
+				pkeyname2="iid";
+			}
+			System.out.println("Enter "+table+" ID.");
+			System.out.print(pkeyname1+": ");
+			String pkey1 = userInput.nextLine();
+			System.out.print(pkeyname2+": ");
+			String pkey2 = userInput.nextLine();
+			System.out.println("Which attribute would you like to update? ");
+			System.out.println(attributeList(table).toString());
+			String attributeUpdate = userInput.nextLine();
+			do
+			{
+				System.out.println("Enter the new value for the attribute: ");
+				String newValue = userInput.nextLine();
+			
+				PreparedStatement salesUpdate = conn.prepareStatement("update " + table
+						+ " set " + attributeUpdate +  " = ? where "+pkeyname1+" = ? and "
+						+ pkeyname2+" = ?;");
+				if(dataType(attributeUpdate).equals("string"))
+					salesUpdate.setString(1,newValue);
+				else if(dataType(attributeUpdate).equals("int"))
+					salesUpdate.setInt(1, Integer.valueOf(newValue));
+				else if(dataType(attributeUpdate).equals("numeric"))
+					salesUpdate.setBigDecimal(1, new BigDecimal(newValue));
+				salesUpdate.setString(2,pkey1);
+				salesUpdate.setString(3,pkey2);
+			
+				int i = salesUpdate.executeUpdate();
+				//letting user know update was successful
+				if(i != 0) {
+					System.out.println("Update successful.");
+				}else {
+					System.out.println("Update failed.");
+				}
+				System.out.println("Enter another attribute, or type X to exit. ");
+				System.out.println(attributeList(table).toString());
+				attributeUpdate = userInput.nextLine();
+			}
+			while(!attributeUpdate.toLowerCase().equals("x"));
+		}
+	}
+	
+	//return int, numeric, or string for the expected data type of the attribute
+	private static String dataType(String attribute)
+	{
+		if(Arrays.binarySearch(intAttributes, attribute)>=0)
+			return "int";
+		else if(Arrays.binarySearch(decAttributes, attribute)>=0)
+			return "numeric";
+		else
+			return "string";
+	}
+	
+	/*
+	 * Author: Evelyn Vazquez, Emily Tao
+	 * Allow user to insert values in tables they have access to. 
+	 * Prompt user for values 
+	 */
+	public static void insert(String table)
+	{
+		if(table.contentEquals("employee"))
+			System.out.println("Warning: Inserting employee data does not create database user.\n"
+				+ "Use CREATE EMPLOYEE to add an employee with a user account.");
+		LinkedList<String> attributes = attributeList(table);
+		LinkedList<String> entries = new LinkedList<String>();
+		int i=0;
+		while(i<attributes.size())
+		{
+			System.out.println("Enter value for "+attributes.get(i));
+			String value = userInput.nextLine();
+			if(value.length()!=0)
+			{
+				entries.add(value);
+				i++;
+			}
+			else
+				attributes.remove(i);
+		}
+		int n=attributes.size();
+		String updatetext = "insert into " + table + "("+attributes.get(0);
+		for(int k=1;k<n;k++)
+			updatetext +=","+attributes.get(k);
+		updatetext += ") values (" + qfill(n) + ");";
+		try {
+			PreparedStatement insert = conn.prepareStatement(updatetext);
+			for(int k=0;k<n;k++)
+			{
+				String newValue = entries.get(k);
+				String type=dataType(attributes.get(k));
+				if(type.equals("string"))
+					insert.setString(k+1,newValue);
+				else if(type.equals("int"))
+					insert.setInt(k+1, Integer.valueOf(newValue));
+				else if(type.equals("numeric"))
+					insert.setBigDecimal(k+1, new BigDecimal(newValue));
+			}
+			int outcome=insert.executeUpdate();
+			if(outcome != 0) {
+				System.out.println("Update successful.");
+			}else {
+				System.out.println("Update failed.");
+			}
+		}
+		catch (SQLException sqle) 
+		{ 
+			System.out.println("SQLException : " + sqle); // handle exceptions 
+		}
+	}
+	
+	private static String qfill(int n)
+	{
+		String output = "?";
+		for(int i=1;i<n;i++)
+			output += ",?";
+		return output;
+	}
+	
+	/* 
+	 * Create a new employee and new user. 
+	 */
+	private static void addEmployee()
+	{
+		if (!role.equals("admin") && !role.equals("hr")){ 
+			//if someone who is not an admin tries to create an employee
+			//it will be denied
+			System.out.println("ACTION DENIED. Only admins and HR can create employees");
+		}
+		else {
+			//employee: eID, firstName, lastName, SSN, salary, isHourly
+			//values for PreparedStatement
+			System.out.println("Enter employee ID: ");
+			String eID = userInput.nextLine();
+			System.out.println("Enter employee first name: ");
+			String firstName = userInput.nextLine();
+			System.out.println("Enter employee last name: ");
+			String lastName = userInput.nextLine();
+			System.out.println("Enter employee SSN: ");
+			Integer SSN = Integer.valueOf(userInput.nextLine());
+			System.out.println("Enter employee salary: ");
+			Integer salary = Integer.valueOf(userInput.nextLine());
+			System.out.println("Is employee hourly (yes or no): ");
+			String isHourly = userInput.nextLine().toLowerCase();
+			System.out.println("Employee type (admin, hr, sales, engineer): ");
+			String type = userInput.nextLine().toLowerCase();
+			int hourly = 0;
+			if(isHourly.equals("yes") || isHourly.equals("y") || isHourly.equals("true"))
+				hourly=1;
+			
+			try {				
+				PreparedStatement createEmployee = conn.prepareStatement("insert into employee(eID, "
+						+ "firstName, lastName, SSN, pay, isHourly, type) "
+						+ "values (?,?,?,?,?,?,?)");
+				//getting user input and inserting into table employee
+				createEmployee.setString(1, eID);
+				createEmployee.setString(2, firstName);
+				createEmployee.setString(3, lastName);
+				createEmployee.setInt(4, SSN);
+				createEmployee.setInt(5, salary);
+				createEmployee.setInt(6, hourly);
+				createEmployee.setString(7, type);
+				int i = createEmployee.executeUpdate();
+				//notifying the user if values were inserted successfully
+				if(i != 0) {
+					System.out.println("Values added successfully.");
+					if(role.equals("admin"))
+					{
+						System.out.println("Creating user...\n");
+						System.out.println("Enter new username: ");
+						String uname = userInput.nextLine();
+						System.out.println("Enter new password: ");
+						String pass = userInput.nextLine();
+						Statement createuser = conn.createStatement();
+						createuser.execute("create user "+uname+" with password '"+pass+"'");
+						System.out.println("User account created.");
+					}
+				}
+				else {
+					System.out.println("Values failed to be added \n");
+				}
+			}
+			catch (SQLException sqle) 
+			{ 
+				System.out.println("SQLException : " + sqle); // handle exceptions 
+			}
+		}
+	}
+	
+	/*
+	 * Create report: Revenue Report
+	 * "Total revenue from sale, associated employee and customer"
+	 * Visible to sales, admin
+	 */
+	public static void salesReport()
+	{
+		if(!(role.equals("sales") || role.equals("admin")))
+			System.out.println("You don't have permission to access this report.");
+		else {
+			try {
+				Statement stmt = conn.createStatement();
+				
+				ResultSet rset = stmt.executeQuery( "select * from totalrevenue");
+				System.out.print("Total revenue: ");
+		        while (rset.next()) { 
+		        	System.out.println(rset.getString(1)); 
+		        }
+		        System.out.println();
+		        System.out.println("Total revenue by employee: ");
+		        rset = stmt.executeQuery( "select * from saleshistory");
+		        printTable(rset);
+		        System.out.println();
+		        System.out.println("Total revenue by employee: ");
+		        ResultSet rset2 = stmt.executeQuery( "select * from totalrevenuebyemp");
+		        printTable(rset2);
+		        System.out.println();
+		        System.out.println("Total revenue by customer: ");
+		        ResultSet rset3 = stmt.executeQuery( "select * from totalrevenuebycust ");
+		        printTable(rset3);
+		        stmt.close();
+			} 
+			catch (SQLException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+	
+	/*
+	 * Create report: Customer Model Trends
+	 * "Customer model bought and quantity to make prediction 
+	 * and understand trending"
+	 * Visible to sales, admin
+	 */
+	public static void trendReport()
+	{
+		if(!(role.equals("sales") || role.equals("admin")))
+			System.out.println("You don't have permission to access this report.");
+		else {
+			try {
+				Statement stmt = conn.createStatement();
+				ResultSet rset = stmt.executeQuery( "select * from customermodel");
+		        System.out.println("Total models purchased by customers: ");
+		        printTable(rset);
+		        stmt.close();
+			} 
+			catch (SQLException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+	
+	/* 
+	 * Create report: Inventory Usage and Parts
+	 * "For each order, the associated parts and available inventory"
+	 * Visible to engineer, admin
+	 */
+	public static void inventoryUsageReport()
+	{
+		if(!(role.equals("engineer") || role.equals("admin")))
+			System.out.println("You don't have permission to access this report.");
+		else {
+				try {
+				Statement stmt = conn.createStatement();
+				ResultSet rset = stmt.executeQuery( "select * from inventoryUsage");
+		        System.out.println("Summary of parts inventory for orders: ");
+		        printTable(rset);
+		        stmt.close();
+			} 
+			catch (SQLException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+	
+	/* 
+	 * Create report: Expenses
+	 * "Expense report, employee showing salary, bonus expense and part cost"
+	 * Visible to admin only
+	 */
+	public static void expenseReport()
+	{
+		if(!role.equals("admin"))
+			System.out.println("You don't have permission to access this report.");
+		else {
+			try {
+				Statement stmt = conn.createStatement();
+				ResultSet rset = stmt.executeQuery( "select * from expensereportsalarytotal");
+				System.out.print("Total expenses from salaried employees: ");
+		        while (rset.next()) { 
+		        	System.out.println(rset.getInt(1)); 
+		        }
+		        ResultSet rset2 = stmt.executeQuery( "select * from expensereportitemtotal");
+				System.out.print("Total expenses from inventory: ");
+		        while (rset2.next()) { 
+		        	System.out.println(rset2.getInt(1)); 
+		        }
+		        System.out.println();
+		        System.out.println("Employee salaries and pay: ");
+		        ResultSet rset3 = stmt.executeQuery( "select * from expensereportsalary ");
+		        printTable(rset3);
+		        System.out.println();
+		        System.out.println("Itemized inventory costs: ");
+		        ResultSet rset4 = stmt.executeQuery( "select * from expensereportitem ");
+		        printTable(rset4);
+		        stmt.close();
+			} 
+			catch (SQLException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+}
+
+
