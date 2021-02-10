@@ -310,51 +310,196 @@ yvar_reformed <- cbind(sales_final$Date[2:nrow(sales_final)], yvar_diff)
 names(yvar_reformed)[1] <- "Date"
 write.csv(yvar_reformed, "yvar_diff.csv")
 
-# ARIMAX w/ external regressors:
+# Part 1: We build simple ARIMA models including just the response variable for each department 
 
 library("tseries")
 install.packages("forecast")
 library(forecast)
 setwd('/Users/RafikaMomin/Desktop') 
-data <- read.csv("Labels.csv", header = F)
+data <- read.csv("Sales.csv", header = F, sep=",")
 head(data)
-data$V2 <- ts(data$V2, start=c(2005, 1), end=c(2020, 5), frequency=12)
-data$V1 <- ts(data$V1, start=c(2005, 1), end=c(2020, 5), frequency=12)
+data$V2 <- ts(data$V2, start=c(2005, 1), end=c(2020, 5), frequency=12) # command works when there is no header in df Sales
+# V2 is Label Sales
+plot(data$V2) # looks like non stationary data (but conduct a dickey-fuller test to test for presence)
+adf.test(data$V2, alternative = "stationary", k=0)   # Dickey-Fuller test for presence of nonstationarity 
+# We can reject the null hypothesis since p-value is significant: We have stationary data. Make no transformations.
+acf(data$V2) # however there is a slow decay in the ACF
 
-head(data)
-plot(data$V2) # non stationary data (but conduct a dickey-fuller test to test for presence)
 plot(diff(data$V2))  #stationary data: mean around 0 and constant variance
-# variance for above plot increases so take the log
-difflabels <- diff(data$V2) 
-fitAR <- arima(data$V2, order=c(1,0,0))   # instead of data$V2, use difflabels if data is NOT stationary
-forecastar <- forecast(fitAR, h=2)
-print(forecastar)
-####
+acf(diff(data$V2))
+diffV2 <- diff(data$V2)
+arimamodel <- auto.arima(data$V2, ic="aic")  #helps find best arima model instead of manually finding p,d,q. Gives same model whether you use original values or differenced values.
+arimamodel
+# Forecast
+forecast_arima <- forecast(arimamodel, h=3) # h = # of months in future, so h=3 means June, July, August
+print(forecast_arima)
+plot(forecast_arima,h=3)
 
-df <- data.frame("age"=c(34,55,87,5,34,28,93,2,98,101), "height"=c(160,155,170,167,189,140,176,142,152,123))
-df
-time <- c(2005:2014)
-df$age <- ts(df$age, start=c(2005), end=c(2014), frequency=1)
-df$height <- ts(df$height, start=c(2005), end=c(2014), frequency=1)
-diffage <- diff(df$age) 
-diffheight <- diff(df$height)
+# Placarding Systems:
 
-response <- c(165,170,190,120,165,142,110,220,100,119)
-fit_diff_arx <- arima(response, order=c(1,0,0), xreg = df)
-fit_diff_arx
-summary(fit_diff_arx)
-plot(response, type="l")
+data$V3 <- ts(data$V3, start=c(2005, 1), end=c(2020, 5), frequency=12) # command works when there is no header in df Sales
+# V3 is Placarding Systems Sales
+plot(data$V3) # looks like non stationary data (but conduct a dickey-fuller test to test for presence)
+adf.test(data$V3, alternative = "stationary", k=0)   # Dickey-Fuller test for presence of nonstationarity 
+# We can reject the null hypothesis since p-value is significant: We have stationary data. Make no transformations.
+acf(data$V3) # however there is a slow decay in the ACF
 
-newdf <- data.frame("age"=c(34,55,87,5,34,28,93,2,98,101,46,32), "height"=c(160,155,170,167,189,140,176,142,152,123,165,151))
-forecastnum <- forecast(fit_diff_arx, h=2)
-newpredict <- data.frame("age"=c(46,32), "height"=c(165,151))
-pred <- predict(fit_diff_arx, n.ahead=2, newxreg=newpredict)    # THIS WORKS!!!
+plot(diff(data$V3))  #stationary data: mean around 0 and constant variance
+acf(diff(data$V3))
+diffV3 <- diff(data$V3)
+arimamodel_ps <- auto.arima(data$V3, ic="aic")  #helps find best arima model instead of manually finding p,d,q. Gives same model whether you use original values or differenced values.
+# Forecast
+forecast_arima_ps <- forecast(arimamodel_ps, h=3) # h = # of months in future, so h=3 means June, July, August
+print(forecast_arima_ps)
+plot(forecast_arima_ps,h=3)
+
+# Placards:
+
+data$V4 <- ts(data$V4, start=c(2005, 1), end=c(2020, 5), frequency=12) # command works when there is no header in df Sales
+# V4 is Placards Sales
+plot(data$V4) # looks like non stationary data (but conduct a dickey-fuller test to test for presence)
+adf.test(data$V4, alternative = "stationary", k=0)   # Dickey-Fuller test for presence of nonstationarity 
+# We can reject the null hypothesis since p-value is significant: We have stationary data. Make no transformations.
+acf(data$V4) # however there is a slow decay in the ACF
+
+plot(diff(data$V4))  #stationary data: mean around 0 and constant variance
+acf(diff(data$V4))
+diffV4 <- diff(data$V4)
+arimamodel_p <- auto.arima(data$V4, ic="aic")  #helps find best arima model instead of manually finding p,d,q. Gives same model whether you use original values or differenced values.
+# Forecast
+forecast_arima_p <- forecast(arimamodel_p, h=3) # h = # of months in future, so h=3 means June, July, August
+print(forecast_arima_p)
+plot(forecast_arima_p,h=3)
+
+# Packaging:
+
+data$V5 <- ts(data$V5, start=c(2005, 1), end=c(2020, 5), frequency=12) # command works when there is no header in df Sales
+# V5 is Packaging Sales
+plot(data$V5) # looks like non stationary data (but conduct a dickey-fuller test to test for presence)
+adf.test(data$V5, alternative = "stationary", k=0)   # Dickey-Fuller test for presence of nonstationarity 
+# We can reject the null hypothesis since p-value is significant: We have stationary data. Make no transformations.
+acf(data$V5) # however there is a slow decay in the ACF
+
+plot(diff(data$V5))  #stationary data: mean around 0 and constant variance
+acf(diff(data$V5))
+diffV5 <- diff(data$V5)
+arimamodel_pack <- auto.arima(data$V5, ic="aic")  #helps find best arima model instead of manually finding p,d,q. Gives same model whether you use original values or differenced values.
+# Forecast
+forecast_arima_pack <- forecast(arimamodel_pack, h=3) # h = # of months in future, so h=3 means June, July, August
+print(forecast_arima_pack)
+plot(forecast_arima_pack, h=3)
+
+# Books:
+
+data$V6 <- ts(data$V6, start=c(2005, 1), end=c(2020, 5), frequency=12) # command works when there is no header in df Sales
+# V6 is Books Sales
+plot(data$V6) # looks like non stationary data (but conduct a dickey-fuller test to test for presence)
+adf.test(data$V6, alternative = "stationary", k=0)   # Dickey-Fuller test for presence of nonstationarity 
+# We can reject the null hypothesis since p-value is significant: We have stationary data. Make no transformations.
+acf(data$V6) # however there is a slow decay in the ACF
+
+plot(diff(data$V6))  #stationary data: mean around 0 and constant variance
+acf(diff(data$V6))
+diffV6 <- diff(data$V6)
+arimamodel_books <- auto.arima(data$V6, ic="aic")  #helps find best arima model instead of manually finding p,d,q. Gives same model whether you use original values or differenced values.
+# Forecast
+forecast_arima_books <- forecast(arimamodel_books, h=3) # h = # of months in future, so h=3 means June, July, August
+print(forecast_arima_books)
+plot(forecast_arima_books, h=3)
+
+# Software:
+
+data$V7 <- ts(data$V7, start=c(2005, 1), end=c(2020, 5), frequency=12) # command works when there is no header in df Sales
+# V7 is Software Sales
+plot(data$V7) # looks like non stationary data (but conduct a dickey-fuller test to test for presence)
+adf.test(data$V7, alternative = "stationary", k=0)   # Dickey-Fuller test for presence of nonstationarity 
+# We can reject the null hypothesis since p-value is significant: We have stationary data. Make no transformations.
+acf(data$V7) # however there is a slow decay in the ACF
+
+plot(diff(data$V7))  #stationary data: mean around 0 and constant variance
+acf(diff(data$V7))
+diffV7 <- diff(data$V7)
+arimamodel_soft <- auto.arima(data$V7, ic="aic")  #helps find best arima model instead of manually finding p,d,q. Gives same model whether you use original values or differenced values.
+# Forecast
+forecast_arima_soft <- forecast(arimamodel_soft, h=3) # h = # of months in future, so h=3 means June, July, August
+print(forecast_arima_soft)
+plot(forecast_arima_soft, h=3)
+
+# Part 2: We build ARIMAX models including the response variable and external regresssors for each department.
+# Because we need future indicators in forecasting, I only included freight data in the ARIMAX models. 
+
+setwd('/Users/RafikaMomin/Desktop') 
+freight <- read.csv("Freight.csv", header = F, sep=",")
+head(freight)
+freight <- freight[,1:19]
+head(freight)
+
+freight$V1 <- ts(freight$V1, start=c(2005, 1), end=c(2020, 5), frequency=12)
+freight$V2 <- ts(freight$V2, start=c(2005, 1), end=c(2020, 5), frequency=12)
+freight$V3 <- ts(freight$V3, start=c(2005, 1), end=c(2020, 5), frequency=12)
+freight$V4 <- ts(freight$V4, start=c(2005, 1), end=c(2020, 5), frequency=12)
+freight$V5 <- ts(freight$V5, start=c(2005, 1), end=c(2020, 5), frequency=12)
+freight$V6 <- ts(freight$V6, start=c(2005, 1), end=c(2020, 5), frequency=12)
+freight$V7 <- ts(freight$V7, start=c(2005, 1), end=c(2020, 5), frequency=12)
+freight$V8 <- ts(freight$V8, start=c(2005, 1), end=c(2020, 5), frequency=12)
+freight$V9 <- ts(freight$V9, start=c(2005, 1), end=c(2020, 5), frequency=12)
+freight$V10 <- ts(freight$V10, start=c(2005, 1), end=c(2020, 5), frequency=12)
+freight$V11 <- ts(freight$V11, start=c(2005, 1), end=c(2020, 5), frequency=12)
+freight$V12 <- ts(freight$V12, start=c(2005, 1), end=c(2020, 5), frequency=12)
+freight$V13 <- ts(freight$V13, start=c(2005, 1), end=c(2020, 5), frequency=12)
+freight$V14 <- ts(freight$V14, start=c(2005, 1), end=c(2020, 5), frequency=12)
+freight$V15 <- ts(freight$V15, start=c(2005, 1), end=c(2020, 5), frequency=12)
+freight$V16 <- ts(freight$V16, start=c(2005, 1), end=c(2020, 5), frequency=12)
+freight$V17 <- ts(freight$V17, start=c(2005, 1), end=c(2020, 5), frequency=12)
+freight$V18 <- ts(freight$V18, start=c(2005, 1), end=c(2020, 5), frequency=12)
+freight$V19 <- ts(freight$V19, start=c(2005, 1), end=c(2020, 5), frequency=12)
+
+setwd('/Users/RafikaMomin/Desktop') 
+data <- read.csv("Sales.csv", header = F, sep=",")
+fmatrix <- data.matrix(freight)
+head(fmatrix)
+# Label Sales:
+fit_arx_labels <- arima(data$V2, order=c(1,1,1), xreg = fmatrix)  #xref should be matrix not df
+summary(fit_arx_labels)
+fit_arx_labels2 <- arima(data$V2, order=c(3,1,0), xreg = fmatrix)  #xref should be matrix not df
+summary(fit_arx_labels2)
+
+
+freightfuture <- read.csv("FreightFuture.csv", header = F, sep=",")
+head(freightfuture)
+pred <- predict(fit_arx_labels, n.ahead=4, newxreg=freightfuture)    # THIS WORKS!!!
 pred
 print(pred)
-plot(newpredict, pred)
 
-print(forecastnum)
-plot(forecastnum, include=15)
+# Placarding Systems
+fit_arx_placsys <- arima(data$V3, order=c(3,1,0), xreg = fmatrix)  
+summary(fit_arx_placsys)
+pred <- predict(fit_arx_placsys, n.ahead=4, newxreg=freightfuture)   
+print(pred)
+
+# Placards
+fit_arx_p <- arima(data$V4, order=c(3,1,0), xreg = fmatrix) 
+summary(fit_arx_p)
+pred <- predict(fit_arx_p, n.ahead=4, newxreg=freightfuture)    
+print(pred)
+
+# Packaging
+fit_arx_pack <- arima(data$V5, order=c(3,1,0), xreg = fmatrix) 
+summary(fit_arx_pack)
+pred <- predict(fit_arx_pack, n.ahead=4, newxreg=freightfuture)    
+print(pred)
+
+# Books
+fit_arx_book <- arima(data$V6, order=c(3,1,0), xreg = fmatrix) 
+summary(fit_arx_book)
+pred <- predict(fit_arx_book, n.ahead=4, newxreg=freightfuture)    
+print(pred)
+
+# Software
+fit_arx_soft <- arima(data$V7, order=c(3,1,0), xreg = fmatrix) 
+summary(fit_arx_soft)
+pred <- predict(fit_arx_soft, n.ahead=4, newxreg=freightfuture)    
+print(pred)
 
 # Final_Model
 
