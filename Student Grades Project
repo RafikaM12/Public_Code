@@ -5,14 +5,13 @@ from sklearn import tree
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import MinMaxScaler
 from matplotlib import pyplot as plt
-#%matplotlib inline
+# %matplotlib inline
 from sklearn.tree import plot_tree
 
 # Change directory
 import os
 os.chdir("/Users/RafikaMomin/Desktop/studentData")
 
-# pandas is a useful tool for dataframes
 import pandas
 df = pandas.read_csv("student-mat.csv")
 print(df.head(5))
@@ -25,8 +24,7 @@ target = df["G3"]
 print(inputs.head(5))
 print(target.head(5))
 
-# Convert labels into numbers. Machine learning can't detect "word labels."
-# This method is called "one hot encoding"?
+# One Hot Encoding: Convert labels into numbers
 
 le_school = LabelEncoder()
 le_sex = LabelEncoder()
@@ -67,9 +65,8 @@ inputs["romantic_n"] = le_school.fit_transform(inputs["romantic"])
 inputs_n = inputs.drop(["school", "sex", "address", "famsize", "Pstatus", "Mjob", "Fjob", "reason", "guardian", "schoolsup", "famsup", "paid", "activities", "nursery", "higher", "internet", "romantic"], axis="columns")
 print(inputs_n.head(5))
 
-# Use Decision Trees, clustering, and other algorithms
-# QUESTION: can decision tree be used for numeric target variable. Yes. They care called regression trees.
-# No need to narrow down variables for Decision Tree
+# Using a regrssion tree because the data has a numeric target variable 
+# Not necessary to eliminate multicollinear variables for a Decision/Regression Tree
 
 #Supervised Learning: Decision Tree:
 print("Assembling Decision Tree...")
@@ -79,7 +76,6 @@ model.fit(inputs_n, target)
 print("The accuracy for the decision tree is: ")
 # Will get 1.0 for below output because we have not split data into test and train yet.
 print(model.score(inputs_n, target))
-# provide a graphic of the decision tree
 # The array of numbers below respectively corresponds to the variables in inputs_n dataframe.
 result = model.predict([[18, 0, 2, 3, 2, 4, 4, 3, 3, 1, 1, 4, 4, 1, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0]])
 print("The predicted G3 score with specified inputs is: ")
@@ -126,11 +122,11 @@ dt_mse = mean_squared_error(y_test, result2)
 print("The mean squared error from the decision tree: ")
 print(dt_mse)
 
-# Let's use Random Forests (uses bootstrapped datasets/randomly selected variables to create multiple decision trees.
+# Let's use Random Forests (uses bootstrapped datasets/randomly selected variables to create multiple decision trees.)
 # Let's see if the accuracy improves.
 print("Assembling Random Forest...")
 from sklearn.ensemble import RandomForestRegressor
-# For parameter in the following line, use square of # of attributes, or the square root?
+# For parameter in the following line, use approximately the square of # of attributes
 rf_model = RandomForestRegressor(500)
 rf_model.fit(x_train, y_train)
 # print("The accuracy for random forests is:")
@@ -150,7 +146,7 @@ print(y_test)
 rf_mse = mean_squared_error(y_test, y_predicted)
 print("The mean squared error from random forest: ")
 print(rf_mse)
-# MSE from the random forest method is less than from the decision/regression tree. Random Forests is a better model for prediction.
+# MSE from the random forest method is less than from the decision/regression tree. Random Forest is a better model for prediction.
 
 '''
 import seaborn as sn
@@ -187,7 +183,7 @@ plt.show()
 # The optimal amount of clusters is 8. After that, sum of squared error decreases only slightly.
 
 km = KMeans(n_clusters=8)
-# Cannot cluster with strings, but because we converted strings to numbers, we can proceed
+# Cannot cluster with strings, but because we converted strings to numbers, we can proceed.
 cluster_num = km.fit_predict(dfx_scale)
 print(cluster_num)
 print(len(cluster_num))
