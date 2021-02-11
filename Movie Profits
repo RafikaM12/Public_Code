@@ -1,0 +1,195 @@
+# KNN Model:
+
+#KNN using top 15 most significant variables per F-score criterion. NOT OUR FINAL KNN MODEL.
+library('caret')
+set.seed(1000)
+
+df1 <- read.csv('/Users/Sunny/Github/CSP571_Movie_Profits_Project/5_merged_with_holidays.csv', stringsAsFactors = T)
+colnames(df1)
+
+##Select categorical columns
+df2 <- df1[,c(32, 7:24, 30, 34:53)]
+
+##Standardize numerical columns
+df3 <- scale(df1[, c(5:6, 27:29, 31, 33)])
+
+##Merge the two dataframes
+colnames(df4)
+df4 <- cbind(df2, df3)
+
+##Separate the independent variables and the dependent variable
+df_ind_col <- df4[,-c(1, 40)]
+df_dep_col <- df4[, 1]
+
+##Create a placeholder list to be populated later
+var_fstat <- as.numeric(rep(NA, times = ncol(df_ind_col)))
+
+##Names of each list item are the independent variable names
+names(var_fstat) <- colnames(df_ind_col)
+
+##Save the F-score of each model after the dependent variable is regressed on each independent variable
+for (i in 1:ncol(df_ind_col)){
+  var_fstat[i] <- summary(lm(substitute(success_1_to_1 ~ i, 
+                                        list(i = as.name(names(var_fstat)[i]))), 
+                             data = df4))$fstatistic[[1]]
+}
+
+##Sort the scores in descending order
+sorted_df <- sort(unlist(var_fstat), decreasing = T)
+
+###############################################################
+
+##Take the top 15 scores to compare to the elastic net variable set
+top_15 <- sorted_df[c(1:15)]
+names(df_15)
+
+##Select those 15 variables from the primary dataset
+df_15 <- df4[, c(1:2, 20, 42:45, 4:7, 9, 15, 17, 19, 21)]
+df_15$success_1_to_1 <- as.factor(df_15$success_1_to_1)
+
+##Partition to train/test sets
+inTrain <- createDataPartition(y = df_15[,'success_1_to_1'], list = FALSE, p = .8)
+train_15 <- df_15[inTrain,]
+test_15 <- df_15[-inTrain,]
+
+##Train the model, only k is tuned, distance and kernel are set to their default values
+model_rectangular_15 <- train(
+  success_1_to_1 ~., 
+  data = train_15, 
+  method = "kknn",
+  trControl = trainControl("cv", number = 10),
+  tuneGrid = expand.grid(kmax = 15:50,
+                         distance = 2,
+                         kernel = c('rectangular')))
+
+##See results of the trained model and how it did on the validation set during cross validation
+plot(model_rectangular_15)
+model_rectangular_15$bestTune
+max(model_rectangular_15$results$Accuracy)
+
+#KNN using the full set of variables. NOT OUR FINAL KNN MODEL.
+
+library('caret')
+set.seed(1000)
+
+df1 <- read.csv('/Users/Sunny/Github/CSP571_Movie_Profits_Project/5_merged_with_holidays.csv', stringsAsFactors = T)
+
+##Convert classification to factors
+df1$success_1_to_1 <- as.factor(df1$success_1_to_1)
+
+##Extract categorical variables and other variables that we do not want to standardize
+df2 <- df1[,c(32, 7:24, 30, 34:53)]
+
+##Standardize numerical columns
+df3 <- scale(df1[, c(5:6, 27:29, 31, 33)])
+
+##Merge the two dataframes
+df4 <- cbind(df2, df3)
+
+##Partition into 80%, and 20% test
+inTrain <- createDataPartition(y = df4[,'success_1_to_1'], list = FALSE, p = .8)
+train <- df4[inTrain,]
+test <- df4[-inTrain,]
+
+train_set <- train[, -c(1)]
+train_label_class <- train[, 1]
+test <- df5[c((splitRow+1):nrow(df5)),]
+test_set <- test[, -c(1)]
+test_label_class <- test[, 1]
+
+##Error Check for row equality
+stopifnot(nrow(train) + nrow(test) == nrow(df4))
+
+##Training the model using the caret package and finding the optimal k for # of neighbors.
+##trControl allows the user to control the resampling criteria. We are using 10-fold cross validation.
+##tuneGrid allows the user to specify the range of k's to test for the best model
+
+##Rectangular / Non-weighted
+model_rectangular <- train(
+  success_1_to_1 ~., 
+  data = train, 
+  method = "kknn",
+  trControl = trainControl("cv", number = 10),
+  tuneGrid = expand.grid(kmax = 15:50,
+                         distance = 2,
+                         kernel = c('rectangular')))
+##See best model and its results on the validation set
+plot(model_rectangular)
+model_rectangular$bestTune
+max(model_rectangular$results$Accuracy)
+
+#KNN using elastic net variable set. KNN FINAL MODEL.
+
+library('caret')
+set.seed(1000)
+
+##Read in data set with only the elastic net variables remaining
+df1_elastic <- read.csv('/Users/Sunny/Github/CSP571_Movie_Profits_Project/elastic_net_final_dataset.csv', stringsAsFactors = T)
+df1_elastic <- df1_elastic[2:20]
+
+##Convert classification to factors
+df1_elastic$success_1_to_1 <- as.factor(df1_elastic$success_1_to_1)
+
+##Separate the categorical variables
+df2_elastic <- df1_elastic[, c(19, 3:11, 15, 17:18)]
+
+##Separate and scale the numerical variables
+df3_elastic <- scale(df1_elastic[, c(1:2, 12:14, 16)])
+
+##Recombine the two dataframes
+df4_elastic <- cbind(df2_elastic, df3_elastic)
+
+##Partition the train/test set
+inTrain <- createDataPartition(y = df4_elastic[,'success_1_to_1'], list = FALSE, p = .8)
+train_elastic <- df4_elastic[inTrain,]
+test_elastic <- df4_elastic[-inTrain,]
+
+##First model with only k tuning, distance and kernel are set to their defaults. This is for comparision
+##against the base model with the full set of variables and with the set of top 15 most significant variables.
+model_rectangular_elastic <- train(
+  success_1_to_1 ~., 
+  data = train_elastic, 
+  method = "kknn",
+  trControl = trainControl("cv", number = 10),
+  tuneGrid = expand.grid(kmax = 15:50,
+                         distance = 2,
+                         kernel = c('rectangular')))
+##See the results on the validation set
+plot(model_rectangular_elastic)
+model_rectangular_elastic$bestTune
+max(model_rectangular_elastic$results$Accuracy)
+
+##Train model with tuning on K and kernel
+model_kernel_elastic <- train(
+  success_1_to_1 ~., 
+  data = train_elastic, 
+  method = "kknn",
+  trControl = trainControl("cv", number = 10),
+  tuneGrid = expand.grid(kmax = 15:50,
+                         distance = 2,
+                         kernel = c('rectangular', 'triangular', 'gaussian', 'epanechnikov')))
+##See which hyperparameter values did best and what the results on the validation set were
+plot(model_kernel_elastic)
+model_kernel_elastic$bestTune
+mean(model_kernel_elastic$results$Accuracy)
+
+##Train the model using the best K and kernel hyperparameters (found above) and this time tune distance
+##Note: This could all tuning could have bee done in one training model but it was divided up into two
+##pieces because runtime was over two hours. This makes it more manageable.
+model_gaussian_elastic <- train(
+  success_1_to_1 ~., 
+  data = train_elastic, 
+  method = "kknn",
+  trControl = trainControl("cv", number = 10),
+  tuneGrid = expand.grid(kmax = 38,
+                         distance = c(1:5),
+                         kernel = c('gaussian')))
+##See which distance value did best and what the results on the validation set were.
+plot(model_gaussian_elastic)
+model_gaussian_elastic$bestTune
+max(model_gaussian_elastic$results$Accuracy)
+
+##Evaluate the final model on the test set and see its performance statistics.
+pred_gaussian_elastic <- predict.train(object = model_gaussian_elastic, test_elastic)
+confusionMatrix(pred_gaussian_elastic, reference = test_elastic$success_1_to_1, positive = '1')
+
