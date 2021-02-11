@@ -1,0 +1,203 @@
+# Student grades dataset. From the UCI repository.
+# There are no missing values in this dataset. Variables are nominal and numeric.
+from sklearn.preprocessing import LabelEncoder
+from sklearn import tree
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import MinMaxScaler
+from matplotlib import pyplot as plt
+#%matplotlib inline
+from sklearn.tree import plot_tree
+
+# Change directory
+import os
+os.chdir("/Users/RafikaMomin/Desktop/studentData")
+
+# pandas is a useful tool for dataframes
+import pandas
+df = pandas.read_csv("student-mat.csv")
+print(df.head(5))
+# We drop G1 and G2 columns because we are only interested in the final grade, G3
+df = df.drop(columns=["G1", "G2"])
+print(df.head(5))
+
+inputs = df.drop("G3", axis="columns")
+target = df["G3"]
+print(inputs.head(5))
+print(target.head(5))
+
+# Convert labels into numbers. Machine learning can't detect "word labels."
+# This method is called "one hot encoding"?
+
+le_school = LabelEncoder()
+le_sex = LabelEncoder()
+le_address = LabelEncoder()
+le_famsize = LabelEncoder()
+le_Pstatus = LabelEncoder()
+le_Mjob = LabelEncoder()
+le_Fjob = LabelEncoder()
+le_reason = LabelEncoder()
+le_guardian = LabelEncoder()
+le_schoolsup = LabelEncoder()
+le_famsup = LabelEncoder()
+le_paid = LabelEncoder()
+le_activities = LabelEncoder()
+le_nursery = LabelEncoder()
+le_higher = LabelEncoder()
+le_internet = LabelEncoder()
+le_romantic = LabelEncoder()
+
+inputs["school_n"] = le_school.fit_transform(inputs["school"])
+inputs["sex_n"] = le_school.fit_transform(inputs["sex"])
+inputs["address_n"] = le_school.fit_transform(inputs["address"])
+inputs["famsize_n"] = le_school.fit_transform(inputs["famsize"])
+inputs["Pstatus_n"] = le_school.fit_transform(inputs["Pstatus"])
+inputs["Mjob_n"] = le_school.fit_transform(inputs["Mjob"])
+inputs["Fjob_n"] = le_school.fit_transform(inputs["Fjob"])
+inputs["reason_n"] = le_school.fit_transform(inputs["reason"])
+inputs["guardian_n"] = le_school.fit_transform(inputs["guardian"])
+inputs["schoolsup_n"] = le_school.fit_transform(inputs["schoolsup"])
+inputs["famsup_n"] = le_school.fit_transform(inputs["famsup"])
+inputs["paid_n"] = le_school.fit_transform(inputs["paid"])
+inputs["activities_n"] = le_school.fit_transform(inputs["activities"])
+inputs["nursery_n"] = le_school.fit_transform(inputs["nursery"])
+inputs["higher_n"] = le_school.fit_transform(inputs["higher"])
+inputs["internet_n"] = le_school.fit_transform(inputs["internet"])
+inputs["romantic_n"] = le_school.fit_transform(inputs["romantic"])
+
+inputs_n = inputs.drop(["school", "sex", "address", "famsize", "Pstatus", "Mjob", "Fjob", "reason", "guardian", "schoolsup", "famsup", "paid", "activities", "nursery", "higher", "internet", "romantic"], axis="columns")
+print(inputs_n.head(5))
+
+# Use Decision Trees, clustering, and other algorithms
+# QUESTION: can decision tree be used for numeric target variable. Yes. They care called regression trees.
+# No need to narrow down variables for Decision Tree
+
+#Supervised Learning: Decision Tree:
+print("Assembling Decision Tree...")
+
+model = tree.DecisionTreeRegressor()
+model.fit(inputs_n, target)
+print("The accuracy for the decision tree is: ")
+# Will get 1.0 for below output because we have not split data into test and train yet.
+print(model.score(inputs_n, target))
+# provide a graphic of the decision tree
+# The array of numbers below respectively corresponds to the variables in inputs_n dataframe.
+result = model.predict([[18, 0, 2, 3, 2, 4, 4, 3, 3, 1, 1, 4, 4, 1, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0]])
+print("The predicted G3 score with specified inputs is: ")
+print(result)
+# split data into training (80%) and test set (20%)
+
+from sklearn.model_selection import train_test_split
+x_train, x_test, y_train, y_test = train_test_split(inputs_n, target, test_size=0.2)
+# 80% of 395 is 316
+print("x_train length:")
+print(len(x_train))
+print("x_test length:")
+print(len(x_test))
+print("y_train length:")
+print(len(y_train))
+print("y_test length:")
+print(len(y_test))
+
+model.fit(x_train, y_train)
+result2 = model.predict(x_test)
+# Below code returns an array of G3 grades
+print("Predicted grades using the trained model using inputs not used to train the model: ")
+print(result2)
+print("Actual grades: ")
+print(y_test)
+
+# A visualization of a graphic tree:
+# figure out dimensions of graphic and add class labels
+
+plt.figure(figsize=(100,5))
+a = plot_tree(model,
+              feature_names=x_train.columns,
+              filled=True,
+              rounded=True,
+              fontsize=4)
+plt.show()
+
+# Asking for accuracy (a classification metric) in a regression setting is meaningless.
+# So we use a regression metric from scikit learn, mean squared error.
+# print(model.score(x_test,y_test))
+
+from sklearn.metrics import mean_squared_error
+dt_mse = mean_squared_error(y_test, result2)
+print("The mean squared error from the decision tree: ")
+print(dt_mse)
+
+# Let's use Random Forests (uses bootstrapped datasets/randomly selected variables to create multiple decision trees.
+# Let's see if the accuracy improves.
+print("Assembling Random Forest...")
+from sklearn.ensemble import RandomForestRegressor
+# For parameter in the following line, use square of # of attributes, or the square root?
+rf_model = RandomForestRegressor(500)
+rf_model.fit(x_train, y_train)
+# print("The accuracy for random forests is:")
+# print(rf_model.score(x_test, y_test))
+
+print("Predicted grades using the trained model using inputs not used to train the model: ")
+y_predicted = rf_model.predict(x_test)
+print("Actual grades: ")
+print(y_test)
+# Confusion Matrix: (meaningless for continuous target variable)
+# from sklearn.metrics import confusion_matrix
+# cm = confusion_matrix(y_test, y_predicted)
+# print("Confusion Matrix:")
+# print(cm)
+
+# Mean Squared Error:
+rf_mse = mean_squared_error(y_test, y_predicted)
+print("The mean squared error from random forest: ")
+print(rf_mse)
+# MSE from the random forest method is less than from the decision/regression tree. Random Forests is a better model for prediction.
+
+'''
+import seaborn as sn
+plt.figure(figsize=(10,7))
+sn.heatmap(cm, annot=True)
+plt.xlabel("Predicted")
+plt.ylabel("Truth")
+'''
+
+# Unsupervised Learning: K-Means Clustering:
+print("Assembling K-Means Clustering... ")
+
+# scale variables, make values between 0 and 1:
+scaler = MinMaxScaler()
+scaler.fit(inputs_n)
+dfx_scale = scaler.transform(inputs_n)
+# print(dfx_scale)
+
+# use elbow method to pick number of clusters.
+Sum_of_squared_distances = []
+K = range(1,15)
+for k in K:
+    km = KMeans(n_clusters=k)
+    km = km.fit(dfx_scale)
+    Sum_of_squared_distances.append(km.inertia_)
+
+
+plt.plot(K, Sum_of_squared_distances, 'bx-')
+plt.xlabel('k')
+plt.ylabel('Sum_of_squared_distances')
+plt.title('Elbow Method For Optimal k')
+plt.show()
+
+# The optimal amount of clusters is 8. After that, sum of squared error decreases only slightly.
+
+km = KMeans(n_clusters=8)
+# Cannot cluster with strings, but because we converted strings to numbers, we can proceed
+cluster_num = km.fit_predict(dfx_scale)
+print(cluster_num)
+print(len(cluster_num))
+
+inputs_n["cluster"] = cluster_num
+# dfx_scale["cluster"] = cluster_num
+print(inputs_n.head(5))
+# print(dfx_scale.head(5))
+
+# Centroids:
+print(km.cluster_centers_)
+
+# End code.
